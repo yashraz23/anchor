@@ -1,0 +1,8 @@
+# Normalise to LF in the repository. These files are checked out into Linux
+# containers and GitHub Actions runners, where CRLF breaks shell and SQL.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+uv.lock text eol=lf
