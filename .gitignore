@@ -1,0 +1,31 @@
+# env
+.env
+.venv/
+venv/
+
+# python
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# data + artifacts (large, reproducible from scripts)
+data/raw/
+data/vllm/
+data/cache/
+models/
+*.db
+
+# experiment tracking
+wandb/
+outputs/
+
+# os / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

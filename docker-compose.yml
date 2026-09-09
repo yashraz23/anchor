@@ -1,0 +1,46 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: anchor-db
+    environment:
+      POSTGRES_USER: anchor
+      POSTGRES_PASSWORD: anchor
+      POSTGRES_DB: anchor
+    ports:
+      # 5433 on the host so this never collides with a local Postgres on 5432.
+      - "5433:5432"
+    volumes:
+      - anchor-pgdata:/var/lib/postgresql/data
+      # Runs once, on an empty data directory. `anchor db init` is the path for
+      # an already-initialised volume.
+      - ./src/anchor/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anchor -d anchor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: anchor-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Container-to-container, so the service name and the internal port.
+      ANCHOR_PG_DSN: postgresql://anchor:anchor@db:5432/anchor
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      HF_HOME: /app/data/cache
+    ports:
+      - "8080:8080"
+    volumes:
+      # Model weights survive a rebuild; downloading bge twice is wasted time.
+      - anchor-hfcache:/app/data/cache
+    profiles: ["app"]
+
+volumes:
+  anchor-pgdata:
+  anchor-hfcache:

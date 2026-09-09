@@ -1,0 +1,93 @@
+name: evals
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  ANCHOR_PG_DSN: postgresql://anchor:anchor@localhost:5432/anchor
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: anchor
+          POSTGRES_PASSWORD: anchor
+          POSTGRES_DB: anchor
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U anchor -d anchor"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.11
+      - run: uv sync --frozen --all-extras
+
+      - name: ruff
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: mypy
+        run: uv run mypy src tests
+
+      - name: schema applies
+        run: uv run anchor db init
+
+      - name: pytest
+        run: uv run pytest --cov=anchor --cov-report=term-missing
+
+  # The golden-set eval. Runs on the corpus the pipeline actually indexed, so it
+  # needs API credentials and cannot run on a fork's pull request.
+  golden-eval:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    # Manual-only until the harness lands in week 2, then this becomes
+    # `github.event_name == 'push'`. Deliberately not stubbed green: an eval
+    # that passes without running is worse than one that does not run.
+    if: github.event_name == 'workflow_dispatch'
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: anchor
+          POSTGRES_PASSWORD: anchor
+          POSTGRES_DB: anchor
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U anchor -d anchor"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - run: uv sync --frozen --all-extras
+
+      # TODO(week-2): wire these up as each stage lands. Left failing-loud
+      # rather than stubbed green, so a broken eval cannot pass silently.
+      - name: placeholder
+        run: |
+          echo "golden-set eval not yet wired. See milestones in CLAUDE.md."
+          exit 1

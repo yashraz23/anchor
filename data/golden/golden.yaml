@@ -1,0 +1,28 @@
+# The golden set.
+#
+# 60 to 80 questions, each sourced from a real vLLM GitHub issue or discussion.
+# Synthetic question generation is deliberately not used: the point of this set
+# is that it carries a real query distribution, and "where did your eval
+# questions come from" is a question worth having a good answer to.
+#
+# Rules for adding an entry:
+#   * source_url is required and must point at the issue or discussion it came
+#     from. An entry without one cannot be defended and does not belong here.
+#   * expected_answer is written from the documentation, not from the model.
+#   * expected_chunk_ids is filled by `anchor golden link` after ingest, because
+#     chunk IDs are only stable within one (strategy, commit) pair.
+#   * difficulty: easy | medium | hard
+#   * category: cli_flag | config | api | concept | troubleshooting | perf
+#
+# Schema of one entry:
+#
+#   - question: "..."
+#     source_url: "https://github.com/vllm-project/vllm/issues/NNNN"
+#     expected_answer: "..."
+#     category: cli_flag
+#     difficulty: easy
+#     expected_chunk_ids: []
+#
+# Empty until week 2. Nothing is invented to fill it.
+
+queries: []
