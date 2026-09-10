@@ -323,6 +323,91 @@ def eval_retrieval_cmd(
         console.print(f"wrote {out}")
 
 
+@app.command("ask")
+def ask_cmd(
+    question: str = typer.Argument(..., help="The question to answer."),
+) -> None:
+    """Retrieve context and generate a cited answer. Calls the generation API."""
+    _configure_logging()
+    from anchor.generate.pipeline import answer_question
+
+    settings = get_settings()
+    answer = answer_question(question, settings)
+
+    console.print(answer.text, markup=False)
+    console.print()
+
+    if answer.abstained:
+        console.print(f"[yellow]abstained: {answer.abstain_reason}[/yellow]")
+
+    for i, hit in enumerate(answer.spans, start=1):
+        mark = "cited" if i in answer.cited else "     "
+        console.print(f"  [{mark}] [{i}] {hit.cite()}", markup=False)
+
+    if answer.invalid_cited:
+        console.print(
+            f"[red]cites spans that were never supplied: {sorted(answer.invalid_cited)}[/red]"
+        )
+
+    completion = answer.completion
+    if completion is not None:
+        cost = "unpriced" if completion.cost_usd is None else f"${completion.cost_usd:.4f}"
+        console.print()
+        console.print(
+            f"  {completion.input_tokens} in / {completion.output_tokens} out"
+            f"   {completion.latency_ms} ms   {cost}"
+        )
+
+
+@golden_app.command("sync")
+def golden_sync() -> None:
+    """Write the golden set into Postgres, resolving expected chunk ids."""
+    _configure_logging()
+    from anchor.evaluate.link import sync_golden
+
+    ids = sync_golden(get_settings())
+    console.print(f"synced {len(ids)} golden queries")
+
+
+@app.command("answer-golden")
+def answer_golden_cmd(
+    yes: bool = typer.Option(False, "--yes", help="Skip the cost confirmation."),
+) -> None:
+    """Generate an answer for every golden question. Costs real money.
+
+    Persists to `answers` so grounding can re-score the same fixed answers
+    without paying to regenerate them.
+    """
+    _configure_logging()
+    from anchor.evaluate.answer_run import run_answers
+    from anchor.evaluate.golden import load_golden
+
+    settings = get_settings()
+    n = len(load_golden(settings.evaluate.golden_path))
+    if not yes:
+        console.print(
+            f"About to generate {n} answers with {settings.generate.anthropic_model}. "
+            "Re-run with --yes to proceed."
+        )
+        raise typer.Exit(1)
+
+    report = run_answers(settings)
+    console.print(f"[bold]run {report.run_id}[/bold]")
+    console.print(f"  answered          {report.answered}")
+    console.print(f"  abstained         {report.abstained}")
+    console.print(f"  total cost        ${report.total_cost_usd:.4f}")
+    if report.cost_per_answer is not None:
+        console.print(f"  cost per answer   ${report.cost_per_answer:.4f}")
+    if report.mean_latency_ms is not None:
+        console.print(f"  mean latency      {report.mean_latency_ms:.0f} ms")
+    if report.uncited_fraction is not None:
+        console.print(f"  spans never cited {report.uncited_fraction:.0%}")
+    if report.invalid_citation_ids:
+        console.print(
+            f"[red]cited a span that was never supplied: {report.invalid_citation_ids}[/red]"
+        )
+
+
 @app.command("integrity")
 def integrity_cmd() -> None:
     """Measure how many fenced code blocks survive each chunking strategy whole.
