@@ -150,3 +150,77 @@ def test_parse_docstrings_returns_none_on_a_syntax_error() -> None:
 def test_content_hash_is_stable_and_content_sensitive() -> None:
     assert content_hash("abc") == content_hash("abc")
     assert content_hash("abc") != content_hash("abd")
+
+
+# --------------------------------------------------------------------------- #
+# attribute docstrings                                                         #
+# --------------------------------------------------------------------------- #
+# vLLM documents its engine arguments and config keys almost entirely as bare
+# string expressions after a field assignment. ast.get_docstring cannot see
+# those, and the rendered engine-arguments page is generated at docs build time
+# rather than committed, so without this the authoritative description of every
+# flag is missing from the corpus entirely.
+CONFIG_MODULE = '''
+"""Scheduler configuration."""
+
+
+class SchedulerConfig:
+    """Configuration for the scheduler."""
+
+    max_num_seqs: int = Field(default=DEFAULT_MAX_NUM_SEQS, ge=1)
+    """Maximum number of sequences to be processed in a single iteration."""
+
+    enable_chunked_prefill: bool = True
+    """Whether to enable chunked prefill."""
+
+    _private_knob: int = 3
+    """Private and must not be ingested."""
+
+    undocumented: int = 5
+
+    def method(self) -> None:
+        """A real method docstring."""
+'''
+
+
+def test_attribute_docstrings_are_captured() -> None:
+    doc = parse_docstrings("vllm/config/scheduler.py", CONFIG_MODULE)
+    assert doc is not None
+    assert "### SchedulerConfig.max_num_seqs" in doc.text
+    assert "Maximum number of sequences to be processed" in doc.text
+    assert "enable_chunked_prefill" in doc.text
+
+
+def test_attribute_declaration_carries_type_and_default() -> None:
+    """Half the answer to "what does this flag do" is its type and default."""
+    doc = parse_docstrings("vllm/config/scheduler.py", CONFIG_MODULE)
+    assert doc is not None
+    assert "max_num_seqs: int = Field(default=DEFAULT_MAX_NUM_SEQS, ge=1)" in doc.text
+
+
+def test_private_attributes_are_excluded() -> None:
+    doc = parse_docstrings("vllm/config/scheduler.py", CONFIG_MODULE)
+    assert doc is not None
+    assert "_private_knob" not in doc.text
+    assert "Private and must not be ingested." not in doc.text
+
+
+def test_an_undocumented_attribute_is_not_emitted() -> None:
+    doc = parse_docstrings("vllm/config/scheduler.py", CONFIG_MODULE)
+    assert doc is not None
+    assert "undocumented" not in doc.text
+
+
+def test_attribute_docs_alone_make_a_module_worth_ingesting() -> None:
+    """A config class with only field docs still has to produce a document."""
+    source = 'class C:\n    x: int = 1\n    """The x knob."""\n'
+    doc = parse_docstrings("vllm/config/x.py", source)
+    assert doc is not None
+    assert "The x knob." in doc.text
+
+
+def test_a_string_not_following_an_assignment_is_not_an_attribute_doc() -> None:
+    source = 'class C:\n    """Class doc."""\n\n    x: int = 1\n'
+    doc = parse_docstrings("vllm/config/x.py", source)
+    assert doc is not None
+    assert "### C.x" not in doc.text

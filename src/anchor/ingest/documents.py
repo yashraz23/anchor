@@ -116,6 +116,52 @@ def _is_public(name: str) -> bool:
     return not name.startswith("_")
 
 
+def _target_name(stmt: ast.AST) -> str | None:
+    """The attribute name bound by an assignment, if it is a plain name."""
+    if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+        return stmt.target.id
+    if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+        target = stmt.targets[0]
+        if isinstance(target, ast.Name):
+            return target.id
+    return None
+
+
+def attribute_docs(node: ast.ClassDef) -> list[tuple[str, str, str]]:
+    """Attribute docstrings on a class, as (name, declaration, docstring).
+
+    An attribute docstring is a bare string expression directly after an
+    assignment::
+
+        max_num_seqs: int = Field(default=DEFAULT_MAX_NUM_SEQS, ge=1)
+        \"\"\"Maximum number of sequences processed in a single iteration.\"\"\"
+
+    `ast.get_docstring` does not see these, because they belong to no function
+    or class. Missing them is not a minor gap for this corpus: vLLM's engine
+    arguments and config keys are documented almost entirely this way, and its
+    rendered engine-arguments page is generated from them at docs build time
+    rather than committed. Without this the authoritative description of every
+    flag is absent from the corpus.
+    """
+    found: list[tuple[str, str, str]] = []
+    body = node.body
+    for i, stmt in enumerate(body[:-1]):
+        name = _target_name(stmt)
+        if name is None or not _is_public(name):
+            continue
+        following = body[i + 1]
+        if not isinstance(following, ast.Expr):
+            continue
+        if not (
+            isinstance(following.value, ast.Constant) and isinstance(following.value.value, str)
+        ):
+            continue
+        # The declaration carries the type and default, which is half the answer
+        # to "what does this flag do and what is it set to by default".
+        found.append((name, ast.unparse(stmt), following.value.value.strip()))
+    return found
+
+
 def parse_docstrings(source_path: str, raw: str) -> ParsedDocument | None:
     """Assemble the public docstrings of one Python module into a document.
 
@@ -146,6 +192,11 @@ def parse_docstrings(source_path: str, raw: str) -> ParsedDocument | None:
             class_doc = ast.get_docstring(node)
             if class_doc:
                 parts.append(f"## class {node.name}\n\n{class_doc.strip()}")
+                documented = True
+            for field_name, declaration, field_doc in attribute_docs(node):
+                parts.append(
+                    f"### {node.name}.{field_name}\n\n```python\n{declaration}\n```\n\n{field_doc}"
+                )
                 documented = True
             for member in node.body:
                 if not isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef):

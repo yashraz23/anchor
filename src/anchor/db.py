@@ -66,12 +66,18 @@ def latest_ingested_commit(conn: psycopg.Connection[DictRow]) -> str | None:
 
 
 def set_ef_search(conn: psycopg.Connection[DictRow], ef_search: int) -> None:
-    """Set the HNSW search-time breadth for this session.
+    """Set the HNSW search-time breadth for the current transaction.
 
     ef_search trades recall against latency and is a sweep dimension, so it is
-    set per session from config rather than baked into the index.
+    set per run from config rather than baked into the index at build time.
+
+    `set_config` rather than `SET LOCAL`, because SET is parsed before bind
+    parameters are substituted and rejects a placeholder outright. set_config is
+    an ordinary function call, so the value can be passed as a parameter instead
+    of interpolated into SQL. Its third argument scopes the change to the
+    current transaction, matching SET LOCAL.
     """
-    conn.execute("SET LOCAL hnsw.ef_search = %s", (ef_search,))
+    conn.execute("SELECT set_config('hnsw.ef_search', %s, true)", (str(ef_search),))
 
 
 def git_sha(repo_root: Path | None = None) -> str:

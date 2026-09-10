@@ -9,15 +9,18 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
+import textwrap
 
 import typer
 from rich.console import Console
 
 from anchor import db
 from anchor.chunk.pipeline import chunk_corpus
-from anchor.config import ChunkStrategy, get_settings
+from anchor.config import ChunkStrategy, RetrievalMode, get_settings
 from anchor.evaluate.chunk_integrity import BUCKETS
 from anchor.evaluate.integrity_run import measure_integrity
+from anchor.index.pipeline import build_index
 from anchor.ingest.pipeline import ingest as run_ingest
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help=__doc__)
@@ -31,6 +34,22 @@ def _configure_logging() -> None:
     """Our own progress at INFO, without httpx logging every model download."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
     logging.getLogger("anchor").setLevel(logging.INFO)
+
+
+@app.callback()
+def _main() -> None:
+    """Force UTF-8 output before any subcommand runs.
+
+    The corpus is real documentation and contains emoji. A Windows console
+    defaults to a legacy codepage that cannot encode them, so printing a
+    retrieved span dies with UnicodeEncodeError partway through the results.
+    errors="replace" so one unencodable glyph degrades to a placeholder rather
+    than losing the span it appeared in.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
 
 
 @db_app.command("init")
@@ -57,18 +76,32 @@ def db_check() -> None:
 
 @app.command("ingest")
 def ingest_cmd(
-    commit: str = typer.Option(
-        "",
-        help="Pin to this vLLM commit. Defaults to the tip of the configured branch.",
+    commit: str = typer.Option("", help="Pin to this exact vLLM commit."),
+    latest: bool = typer.Option(
+        False,
+        "--latest",
+        help="Advance the corpus to the tip of the branch. Requires re-chunking.",
     ),
     no_docstrings: bool = typer.Option(
         False, "--no-docstrings", help="Markup only. Much faster for a smoke run."
     ),
 ) -> None:
-    """Clone vLLM at a pinned commit, parse the docs, and version-tag them."""
+    """Clone vLLM at a pinned commit, parse the docs, and version-tag them.
+
+    Re-running stays on the commit already ingested. Silently advancing to the
+    branch tip would orphan every chunk and embedding built against the previous
+    one, and would invalidate any measurement already recorded, since vLLM's main
+    moves several times a day. Advancing is therefore explicit: `--latest`.
+    """
     settings = get_settings()
     if commit:
         settings.ingest.vllm_commit = commit
+    elif not latest:
+        with db.connect(settings) as conn:
+            existing = db.latest_ingested_commit(conn)
+        if existing:
+            settings.ingest.vllm_commit = existing
+            console.print(f"[dim]staying on ingested commit {existing[:12]}[/dim]")
     if no_docstrings:
         settings.ingest.include_docstrings = False
 
@@ -113,6 +146,66 @@ def chunk_cmd(
             f"[yellow]{report.missing_documents} files had no document row; "
             "run `anchor ingest` first[/yellow]"
         )
+
+
+@app.command("index")
+def index_cmd() -> None:
+    """Embed every chunk into pgvector and build its tsvector.
+
+    Resumable: both passes select only rows still missing their column, so an
+    interrupted run picks up rather than re-embedding the corpus.
+    """
+    _configure_logging()
+    report = build_index(get_settings())
+    console.print(f"  embedded          {report.embedded}")
+    console.print(f"  tsvectors built   {report.tsv_built}")
+    console.print(f"  already embedded  {report.already_embedded}")
+
+
+@app.command("search")
+def search_cmd(
+    query: str = typer.Argument(..., help="The question to retrieve for."),
+    mode: str = typer.Option("", help="dense, sparse or hybrid. Default from config."),
+    strategy: str = typer.Option("", help="Chunking strategy to search."),
+) -> None:
+    """Retrieve for one query and print the spans, for eyeballing quality."""
+    _configure_logging()
+    settings = get_settings()
+    chosen = ChunkStrategy(strategy) if strategy else settings.chunk.strategy
+
+    from anchor.index.embed import Embedder
+    from anchor.retrieve.search import search
+
+    embedder = Embedder(
+        settings.index.embedding_model,
+        normalize=settings.index.normalize_embeddings,
+        query_instruction=settings.index.query_instruction,
+    )
+    with db.connect(settings) as conn:
+        hits = search(
+            conn,
+            query,
+            settings,
+            embedder,
+            strategy=chosen.value,
+            mode=RetrievalMode(mode) if mode else None,
+        )
+
+    console.print(f"[bold]{len(hits)} spans[/bold] for {query!r} ({chosen.value})")
+    console.print()
+    for i, hit in enumerate(hits, start=1):
+        # markup=False on every line carrying corpus text. Retrieved spans are
+        # documentation, full of square brackets that rich would otherwise parse
+        # as style tags and reject.
+        flag = "  (code)" if hit.is_code_block else ""
+        console.print(
+            f"span {i}  {hit.cite()}  score={hit.score:.4f}{flag}",
+            markup=False,
+            style="bold",
+        )
+        body = hit.text if len(hit.text) <= 300 else hit.text[:300] + "..."
+        console.print(textwrap.indent(body, "    "), markup=False)
+        console.print()
 
 
 @app.command("integrity")
