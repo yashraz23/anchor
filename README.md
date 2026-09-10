@@ -30,6 +30,9 @@ under this strategy contain that block's body verbatim? A block split across two
 chunks fails, because neither half is a command anyone can run.
 
 Corpus: vLLM v0.28.1rc0 at commit `65f3fca5`, 1722 documents, 6245 code blocks.
+(Document count later rose to 1729 once attribute docstrings were captured; the
+integrity numbers below predate that and are unaffected by it, since it added
+no code blocks.)
 
 | Chunking | Code blocks intact | Rate |
 |---|---|---|
@@ -64,6 +67,56 @@ above that is at the mercy of where it happens to land.
 input limit, the largest at 913 tokens. Structure-aware chunking keeps those
 whole in storage, but bge-small still truncates them at embed time, so "intact"
 means retrievable as text, not fully embedded.
+
+### Corpus: where vLLM's documentation actually lives
+
+Building retrieval over this corpus surfaced something worth recording, because
+it changes what "ingest the docs" has to mean.
+
+vLLM's engine arguments and config keys are documented almost entirely as
+**attribute docstrings**: a bare string expression following a field
+assignment.
+
+```python
+max_num_seqs: int = Field(default=DEFAULT_MAX_NUM_SEQS, ge=1)
+"""Maximum number of sequences to be processed in a single iteration."""
+```
+
+Python's `ast.get_docstring` cannot see these, because they belong to no
+function or class. An ingester that walks docstrings the obvious way silently
+drops every one. In `vllm/config/` alone that is **532 field descriptions**.
+
+It compounds: the rendered engine-arguments page is generated from those fields
+at docs build time and is not committed. The source tree holds only a stub
+ending in an mkdocs include directive, and 29 doc pages are stubs of that shape.
+So the authoritative description of every engine flag is absent from both the
+docs sources *and* a naive docstring pass.
+
+Measured effect on the query "what does max_num_seqs do and what is its
+default":
+
+| | Before | After |
+|---|---|---|
+| Chunks mentioning `max_num_seqs` | 12 | 18 |
+| Top reranked span | wrong document | `SchedulerConfig.max_num_seqs`, score 0.99 |
+
+This is also the clearest argument yet for the symbol oracle in week 2. The
+ground truth for flags and config keys is in the source tree, not the prose.
+
+### Retrieval: an open weakness, to be quantified
+
+On a natural-language phrasing of the same question, "how do I limit the number
+of concurrent sequences the server handles", the pipeline does **not** surface
+that chunk. Its cosine similarity is 0.654 against a corpus best of 0.709, and
+78 chunks outrank it. Raising the candidate pool to 200 does not rescue it: the
+cross-encoder scores every candidate below 0.11, so it is not confident in any
+of them.
+
+The cause is a vocabulary gap between how a user asks and how the docs are
+written. Recording it rather than tuning it away: `dense_top_k` and the
+reranking knobs are experiment variables, and the golden set is what decides
+them. The golden questions come from real GitHub issues, so this gap is exactly
+the distribution they will test.
 
 ### Retrieval: recall@k by chunking strategy and retrieval mode
 
@@ -153,8 +206,15 @@ uv run anchor config      # the exact JSON written to runs.config_json
 
 uv run anchor ingest      # clone vLLM at a pinned commit, parse, version-tag
 uv run anchor chunk       # build both chunking strategies over the corpus
+uv run anchor index       # embed into pgvector and build the tsvectors
 uv run anchor integrity   # the code-block integrity table above
+
+uv run anchor search "what does max_num_seqs do and what is its default"
 ```
+
+Re-running `ingest` stays on the commit already ingested. Advancing to the
+branch tip is explicit (`--latest`), because it orphans every chunk and
+embedding built against the previous commit.
 
 Every stage after `ingest` pins itself to the commit the corpus was ingested at,
 read back from the database. vLLM's main branch moves several times a day, so a
