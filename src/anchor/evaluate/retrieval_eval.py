@@ -17,6 +17,7 @@ that touch Postgres only gather ranked paths.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -192,3 +193,24 @@ def paired_comparison(a: ConfigOutcome, b: ConfigOutcome, k: int) -> Paired:
         else:
             ties += 1
     return Paired(a_wins=a_wins, b_wins=b_wins, ties=ties)
+
+
+def sign_test_p_value(wins: int, losses: int) -> float | None:
+    """Two-sided exact sign test on a paired win/loss record.
+
+    The appropriate test here, and deliberately a weak one. It assumes only that
+    under the null hypothesis each question that separates the two
+    configurations is a coin flip, which is the least this comparison can assume.
+    Ties carry no directional information and are excluded, which is what the
+    sign test does by construction.
+
+    Returns None when nothing was decided, since a test on no evidence has no
+    p-value rather than a p-value of 1.
+    """
+    n = wins + losses
+    if n == 0:
+        return None
+    extreme = min(wins, losses)
+    tail = sum(math.comb(n, i) for i in range(extreme + 1))
+    p_value: float = min(1.0, 2.0 * tail / (2**n))
+    return p_value

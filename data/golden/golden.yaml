@@ -20,8 +20,12 @@
 #     from what the system already finds is a transcript of current behaviour and
 #     cannot measure anything. See vllm-6660-disable-logging.
 #   * Questions no documentation can answer are dropped, not marked hard. Issue
-#     9750 ("Can I get the loss of model directly?") and 13609 (sparse
-#     embeddings) were rejected on that basis.
+#     9750 ("Can I get the loss of model directly?") was rejected on that basis,
+#     as was 19556 (Whisper timestamps): the only mention of timestamps in the
+#     docs is inside a code sample about implementing a model.
+#     A rejection can itself be wrong. Issue 13609 (sparse embeddings) was
+#     dropped in the first pass and later reinstated once specific_models.md was
+#     found to document it. Rejections are re-checked, not treated as final.
 #   * expected_answer is written from the documentation. Where it is blank it has
 #     not been transcribed from the source yet; it is never filled from a model's
 #     output.
@@ -29,8 +33,8 @@
 # expected_chunk_ids is intentionally absent: chunk ids are stable only within
 # one (strategy, commit) pair, so they are resolved from the paths at eval time.
 #
-# STATUS: 21 of a target 60-80. This is a first curated batch, not the finished
-# set. The remaining candidates are in candidates.jsonl awaiting review.
+# STATUS: 33 of a target 60-80. Curation continues; the remaining candidates
+# are in candidates.jsonl awaiting review.
 
 queries:
   - id: vllm-4449-enforce-eager
@@ -227,3 +231,115 @@ queries:
       Another known failure. Retrieval currently returns the security and
       integrations pages with high reranker confidence, which is a false
       positive worth measuring rather than hiding.
+
+  # ---- batch 2 -----------------------------------------------------------
+  # Curated from the same evidence pass. One entry here corrects an earlier
+  # rejection: the sparse-embedding question was first dropped as unanswerable,
+  # but specific_models.md documents it explicitly, including the serve command.
+  # The rejection was wrong and the entry belongs in the set.
+
+  - id: vllm-13609-sparse-embeddings
+    question: How can I get the sparse embedding from OpenAI Embedding Client?
+    source_url: https://github.com/vllm-project/vllm/issues/13609
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/models/pooling_models/specific_models.md
+      - docs/models/pooling_models/embed.md
+    notes: >-
+      Initially rejected as unanswerable during the first curation pass. That
+      was wrong: specific_models.md documents sparse retrieval for BAAI/bge-m3,
+      including the pooling task and the serve invocation.
+
+  - id: vllm-10951-token-logprobs
+    question: How to get token level probablity scores
+    source_url: https://github.com/vllm-project/vllm/issues/10951
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - vllm/sampling_params.py
+    notes: >-
+      The answer is the logprobs sampling parameter, documented as an attribute
+      docstring. Only reachable because the ingester captures those.
+
+  - id: vllm-8816-memory-allocation
+    question: How does VLLM allocate memory
+    source_url: https://github.com/vllm-project/vllm/issues/8816
+    category: concept
+    difficulty: medium
+    expected_source_paths:
+      - docs/configuration/optimization.md
+      - docs/design/hybrid_kv_cache_manager.md
+
+  - id: vllm-7495-reduce-gpu-memory
+    question: Is there an option to reduce GPU memory usage?
+    source_url: https://github.com/vllm-project/vllm/issues/7495
+    category: config
+    difficulty: easy
+    expected_source_paths:
+      - docs/configuration/conserving_memory.md
+
+  - id: vllm-39993-architecture-support
+    question: does vllm support Qwen3_5ForCausalLM architecture inference?
+    source_url: https://github.com/vllm-project/vllm/issues/39993
+    category: concept
+    difficulty: easy
+    expected_source_paths:
+      - docs/models/supported_models.md
+
+  - id: vllm-15031-gemma3-language-model-param
+    question: There is no module or parameter named 'language_model' in Gemma3ForCausalLM
+    source_url: https://github.com/vllm-project/vllm/issues/15031
+    category: troubleshooting
+    difficulty: hard
+    expected_source_paths:
+      - docs/contributing/model/multimodal.md
+
+  - id: vllm-24064-sleep-mode-rlhf
+    question: How to start vllm actor of ray without loading weights when RLHF?
+    source_url: https://github.com/vllm-project/vllm/issues/24064
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/features/sleep_mode.md
+      - docs/training/rlhf.md
+
+  - id: vllm-3655-tensor-input-custom-tokenizer
+    question: How to use vLLM with `Tensor` input (customized tokenizer)
+    source_url: https://github.com/vllm-project/vllm/issues/3655
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/contributing/model/basic.md
+
+  - id: vllm-1582-chat-function
+    question: how to use chat function
+    source_url: https://github.com/vllm-project/vllm/issues/1582
+    category: api
+    difficulty: easy
+    expected_source_paths:
+      - docs/models/generative_models.md
+
+  - id: vllm-5061-mistral-tool-calling
+    question: not support for mistralai/Mistral-7B-Instruct-v0.3
+    source_url: https://github.com/vllm-project/vllm/issues/5061
+    category: troubleshooting
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/tool_calling.md
+
+  - id: vllm-19001-deepseek-function-call
+    question: How to use DeepSeek-R1-0528-Qwen3-8B with function call
+    source_url: https://github.com/vllm-project/vllm/issues/19001
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/tool_calling.md
+
+  - id: vllm-18948-asyncllm-metrics-logging
+    question: How to log stat when using AsyncLLM locally (do not based on openAI api server)
+    source_url: https://github.com/vllm-project/vllm/issues/18948
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - vllm/v1/metrics/loggers.py

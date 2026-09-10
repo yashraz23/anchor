@@ -7,6 +7,8 @@ come from logic specified first rather than fitted to a result.
 
 from __future__ import annotations
 
+import pytest
+
 from anchor.evaluate.retrieval_eval import (
     ConfigOutcome,
     QueryOutcome,
@@ -15,6 +17,7 @@ from anchor.evaluate.retrieval_eval import (
     paired_comparison,
     recall_at_k,
     render_table,
+    sign_test_p_value,
 )
 
 
@@ -165,3 +168,32 @@ def test_paired_comparison_excludes_questions_without_ground_truth() -> None:
     b = _cell("b", [_outcome(["y.md"], [], "ungradable")])
     result = paired_comparison(a, b, 1)
     assert (result.a_wins, result.b_wins, result.ties, result.decided) == (0, 0, 0, 0)
+
+
+def test_sign_test_on_a_clean_sweep() -> None:
+    """11-0 is p = 2 * 0.5^11."""
+    p = sign_test_p_value(11, 0)
+    assert p is not None
+    assert p == pytest.approx(2 * 0.5**11)
+    assert p < 0.01
+
+
+def test_sign_test_is_symmetric() -> None:
+    """Direction is the caller's to interpret; the test only sees the split."""
+    assert sign_test_p_value(11, 0) == sign_test_p_value(0, 11)
+
+
+def test_sign_test_on_an_even_split_is_not_significant() -> None:
+    p = sign_test_p_value(5, 5)
+    assert p is not None
+    assert p == pytest.approx(1.0)
+
+
+def test_sign_test_on_a_single_question_cannot_be_significant() -> None:
+    """One question is never evidence, and the arithmetic has to agree."""
+    assert sign_test_p_value(1, 0) == pytest.approx(1.0)
+
+
+def test_sign_test_with_nothing_decided_is_none() -> None:
+    """A test on no evidence has no p-value, not a p-value of 1."""
+    assert sign_test_p_value(0, 0) is None

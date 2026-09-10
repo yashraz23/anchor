@@ -20,6 +20,7 @@ from anchor.evaluate.retrieval_eval import (
     evaluate_config,
     paired_comparison,
     render_table,
+    sign_test_p_value,
 )
 from anchor.index.embed import Embedder
 
@@ -131,11 +132,13 @@ def render_report(report: SweepReport, settings: Settings) -> str:
         lines.append("")
         lines.append("Paired, structure_aware vs fixed (both hybrid + rerank), per question:")
         lines.append("")
-        lines.append("| k | structure_aware better | fixed better | same |")
-        lines.append("|---|---|---|---|")
+        lines.append("| k | structure_aware better | fixed better | same | sign test |")
+        lines.append("|---|---|---|---|---|")
         for k in ks:
-            p = paired_comparison(aware, fixed, k)
-            lines.append(f"| {k} | {p.a_wins} | {p.b_wins} | {p.ties} |")
+            pair = paired_comparison(aware, fixed, k)
+            p_value = sign_test_p_value(pair.a_wins, pair.b_wins)
+            shown = "-" if p_value is None else f"p = {p_value:.4f}"
+            lines.append(f"| {k} | {pair.a_wins} | {pair.b_wins} | {pair.ties} | {shown} |")
 
     # Questions no configuration ever retrieves are the ones worth naming: they
     # are corpus or retriever failures, not ranking noise.

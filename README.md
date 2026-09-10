@@ -131,7 +131,7 @@ reaction count, then curating against retrieval evidence rather than titles.
 | | |
 |---|---|
 | Candidates harvested | 563 |
-| Curated so far | 21 |
+| Curated so far | 33 |
 | Target | 60-80 |
 
 Two curation rules are worth stating, because they are what stop the set
@@ -143,8 +143,12 @@ measuring the wrong thing:
   pipeline gets it wrong today.
 - **Questions no documentation can answer are dropped, not marked hard.**
   "Can I get the loss of model directly?" was rejected on that basis, as was a
-  sparse-embeddings question with no corresponding page. Keeping them would make
-  retrieval look broken when the corpus, not the retriever, is the limit.
+  Whisper-timestamps question whose only match is a code sample about
+  implementing a model. Keeping them would make retrieval look broken when the
+  corpus, not the retriever, is the limit.
+- **A rejection can itself be wrong, so rejections get re-checked.** A
+  sparse-embeddings question was dropped in the first pass and reinstated once
+  `specific_models.md` turned out to document it, serve command included.
 
 Entries store expected *document paths*, not chunk ids: chunk ids are stable
 only within one (strategy, commit) pair, so pinning them in a version-controlled
@@ -161,57 +165,58 @@ rather than whichever retrieves the right material.
 
 | Chunking | Retrieval | recall@1 | recall@3 | recall@5 | recall@10 | recall@20 |
 |---|---|---|---|---|---|---|
-| `fixed` | dense | 0.36 | 0.60 | 0.74 | 0.81 | 0.81 |
-| `fixed` | sparse | 0.17 | 0.26 | 0.26 | 0.26 | 0.29 |
-| `fixed` | hybrid (RRF) | 0.43 | 0.64 | 0.79 | 0.83 | 0.83 |
-| `fixed` | hybrid (RRF) + rerank | 0.45 | 0.71 | 0.74 | 0.81 | 0.83 |
-| `structure_aware` | dense | 0.52 | 0.67 | 0.69 | 0.76 | 0.88 |
-| `structure_aware` | sparse | 0.21 | 0.31 | 0.31 | 0.31 | 0.33 |
-| `structure_aware` | hybrid (RRF) | 0.52 | 0.74 | 0.74 | 0.79 | 0.90 |
-| `structure_aware` | **hybrid (RRF) + rerank** | **0.60** | **0.86** | **0.88** | **0.88** | **0.90** |
+| `fixed` | dense | 0.23 | 0.47 | 0.64 | 0.74 | 0.74 |
+| `fixed` | sparse | 0.15 | 0.24 | 0.24 | 0.24 | 0.27 |
+| `fixed` | hybrid (RRF) | 0.30 | 0.55 | 0.68 | 0.76 | 0.79 |
+| `fixed` | hybrid (RRF) + rerank | 0.35 | 0.64 | 0.70 | 0.77 | 0.79 |
+| `structure_aware` | dense | 0.45 | 0.61 | 0.67 | 0.74 | 0.91 |
+| `structure_aware` | sparse | 0.18 | 0.24 | 0.24 | 0.24 | 0.27 |
+| `structure_aware` | hybrid (RRF) | 0.48 | 0.67 | 0.71 | 0.79 | 0.94 |
+| `structure_aware` | **hybrid (RRF) + rerank** | **0.55** | **0.89** | **0.91** | **0.92** | **0.94** |
 
-Run 2, commit `9012b8d`, 21 golden questions. Reproduce with
+Run 3, commit `fd75f95`, 33 golden questions. Reproduce with
 `uv run anchor eval-retrieval`.
 
-**Read the sample size before the numbers.** 21 questions means one question is
-worth 0.048 recall, so no two cells differing by less than about 0.10 should be
-treated as distinct. The set is on its way to 60-80; these are directional.
+Every cell runs the same questions, so the paired record is the honest
+comparison and a two-sided exact sign test is the appropriate check. It assumes
+only that a question separating the two configurations is a coin flip under the
+null, which is the least this comparison can assume. Ties carry no directional
+information and are excluded, which is what the sign test does by construction.
 
-Because every cell runs the same questions, the paired record is the honest
-comparison, and it is stronger than the difference of means:
+| k | `structure_aware` better | `fixed` better | same | sign test |
+|---|---|---|---|---|
+| 1 | 11 | 1 | 21 | p = 0.0063 |
+| 3 | 11 | 0 | 22 | p = 0.0010 |
+| 5 | 9 | 0 | 24 | p = 0.0039 |
+| 10 | 7 | 0 | 26 | p = 0.0156 |
+| 20 | 7 | 0 | 26 | p = 0.0156 |
 
-| k | `structure_aware` better | `fixed` better | same |
-|---|---|---|---|
-| 1 | 6 | 1 | 14 |
-| 3 | 5 | 0 | 16 |
-| 5 | 5 | 0 | 16 |
-| 10 | 3 | 0 | 18 |
-| 20 | 3 | 0 | 18 |
-
-Structure-aware chunking never loses a question at k of 3 or more. That is a
-directional result rather than a significant one at this sample size, but it is
-a much better claim than "0.86 versus 0.71", which is five questions.
+**Structure-aware chunking wins 11 questions and loses none at k=3.** With 33
+questions that is significant at every depth measured, and the direction never
+reverses. It is a single eval set on one corpus, so it is evidence about vLLM's
+documentation rather than a general claim about chunking.
 
 What the table supports:
 
-- **Hybrid beats dense alone, and the gap is small.** Fusion adds 0.02 to 0.07
-  depending on depth. It earns its place mainly through the questions dense
-  retrieval misses entirely, not by reordering the ones it already finds.
-- **Sparse alone is weak here, at 0.29 to 0.33 recall@20.** That is not a bug.
-  These are natural-language questions from issue titles, and they share almost
-  no vocabulary with the documentation. Keyword search cannot match
-  "concurrent sequences" to `max_num_seqs`.
-- **Reranking helps structure-aware and does not help fixed.** It lifts
-  structure-aware from 0.74 to 0.88 at recall@5, but moves fixed from 0.79 to
-  0.74. A cross-encoder scores a query against a passage, and a fixed-size
-  window that starts and ends mid-sentence is a worse passage to score. The
-  chunking strategy and the reranker are not independent choices.
+- **Sparse alone is weak here, at 0.27 recall@20.** Not a bug. These are
+  natural-language issue titles that share almost no vocabulary with the docs,
+  and keyword search cannot match "concurrent sequences" to `max_num_seqs`. It
+  earns its place inside the hybrid, not on its own.
+- **Reranking helps structure-aware far more than fixed**, lifting recall@3 from
+  0.67 to 0.89 against 0.55 to 0.64. A cross-encoder scores a query against a
+  passage, and a fixed-size window that starts and ends mid-sentence is a worse
+  passage to score. Chunking and reranking are not independent choices, which is
+  not visible from either row alone.
 - **Two questions are never retrieved by any configuration.** Both were flagged
-  as expected failures during curation, before this ran:
+  as expected failures during curation, before the harness existed:
   `vllm-6660-disable-logging`, whose answer lives only in `vllm/envs.py` because
   the env-var page is an mkdocs stub, and
-  `vllm-23108-gpt-oss-builtin-python-tool`. Keeping known failures in the set is
-  what lets it measure anything.
+  `vllm-23108-gpt-oss-builtin-python-tool`.
+- **The absolute numbers fell when the set grew from 21 to 33.** `fixed` at
+  recall@1 went 0.45 to 0.35. The second curation batch added harder questions,
+  so the set got harder rather than the system getting worse. This is the
+  expected direction while a golden set is still being built, and it is the
+  reason the run id and commit are printed next to every table.
 
 ### Grounding: strictness versus completeness
 
