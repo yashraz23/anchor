@@ -92,6 +92,10 @@ class IngestSettings(BaseModel):
     vllm_commit: str = ""
     vllm_branch: str = "main"
     checkout_dir: Path = REPO_ROOT / "data" / "vllm"
+    # Ingest this directory instead of cloning vLLM. Set in CI, which cannot
+    # clone and embed the real corpus in reasonable time but still has to run
+    # the evals. Everything downstream is identical; only the source differs.
+    local_source: Path | None = None
 
     # Globs relative to the vLLM checkout root.
     doc_globs: tuple[str, ...] = ("docs/**/*.md", "docs/**/*.rst", "README.md")

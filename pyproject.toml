@@ -65,6 +65,7 @@ packages = ["src/anchor"]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["tests/fixtures"]
 target-version = "py311"
 src = ["src", "tests"]
 
@@ -77,6 +78,9 @@ ignore = ["E501"]  # formatter owns line length
 
 [tool.mypy]
 python_version = "3.11"
+# The fixture corpus is sample vLLM source, deliberately untyped: it exists to
+# be parsed by the ingester and the oracle, not to be imported.
+exclude = "^tests/fixtures/"
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]

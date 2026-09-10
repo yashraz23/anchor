@@ -12,6 +12,7 @@ oracle needs the full source tree at exactly the pinned commit.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import subprocess
 from dataclasses import dataclass
@@ -113,6 +114,21 @@ def prepare_checkout(settings: IngestSettings, commit: str | None = None) -> Rep
     later stage that re-resolves the tip silently checks out a different tree
     than the one `documents` describes, and every path lookup then misses.
     """
+    if settings.local_source is not None:
+        # A local corpus has no git history. The identity that matters
+        # downstream is "which tree was this", so the path stands in for the
+        # commit and is recorded on every document exactly as a SHA would be.
+        root = settings.local_source.resolve()
+        if not root.is_dir():
+            raise RepoError(f"ingest.local_source is not a directory: {root}")
+        digest = hashlib.sha1(str(root).encode("utf-8")).hexdigest()
+        return RepoSnapshot(
+            root=root,
+            commit_sha=f"local-{digest[:32]}",
+            vllm_version=resolve_version(root),
+            repo_url=settings.vllm_repo_url,
+        )
+
     root = settings.checkout_dir
     root.parent.mkdir(parents=True, exist_ok=True)
 

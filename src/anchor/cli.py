@@ -303,6 +303,10 @@ def golden_validate() -> None:
 @app.command("eval-retrieval")
 def eval_retrieval_cmd(
     out: str = typer.Option("", help="Write the markdown table here as well."),
+    min_recall: float = typer.Option(
+        0.0,
+        help="Fail if the best configuration's recall@5 falls below this.",
+    ),
 ) -> None:
     """Run the recall@k sweep over the golden set and print the table.
 
@@ -321,6 +325,21 @@ def eval_retrieval_cmd(
         Path(out).write_text(f"{rendered}\n", encoding="utf-8")
         console.print()
         console.print(f"wrote {out}")
+
+    if min_recall > 0.0:
+        # A regression gate, not a target. It asserts that the best
+        # configuration still finds the right document, so a change that
+        # silently breaks retrieval fails the build instead of shipping.
+        best = max(
+            (r.recall_row(list(settings.evaluate.recall_at))[2] or 0.0) for r in report.results
+        )
+        console.print()
+        if best < min_recall:
+            console.print(
+                f"[red]best recall@5 is {best:.2f}, below the floor of {min_recall:.2f}[/red]"
+            )
+            raise typer.Exit(1)
+        console.print(f"[green]best recall@5 {best:.2f} >= floor {min_recall:.2f}[/green]")
 
 
 @app.command("ask")

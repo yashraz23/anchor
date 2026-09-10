@@ -1,0 +1,32 @@
+# A tiny golden set over the fixture corpus in tests/fixtures/corpus.
+#
+# Exists so evals run in CI. The real set is sourced from vLLM issues and needs
+# the full corpus, which CI cannot build in reasonable time; this proves the
+# whole pipeline works end to end on every push instead. Its questions are
+# paraphrases rather than issue quotes, which is why it is a separate file:
+# mixing them into golden.yaml would break that file's provenance guarantee.
+
+queries:
+  - id: fixture-max-num-seqs
+    question: How do I limit the batch size and context length?
+    source_url: https://github.com/vllm-project/vllm/issues/6641
+    category: config
+    difficulty: easy
+    expected_source_paths:
+      - docs/engine_args.md
+
+  - id: fixture-enforce-eager
+    question: what is enforce_eager
+    source_url: https://github.com/vllm-project/vllm/issues/4449
+    category: config
+    difficulty: easy
+    expected_source_paths:
+      - docs/engine_args.md
+
+  - id: fixture-fp8-kv-cache
+    question: What FP8 formats can the KV cache use?
+    source_url: https://github.com/vllm-project/vllm/issues/3990
+    category: config
+    difficulty: easy
+    expected_source_paths:
+      - docs/quantization.md
