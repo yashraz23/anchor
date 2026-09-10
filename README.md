@@ -154,6 +154,49 @@ Entries store expected *document paths*, not chunk ids: chunk ids are stable
 only within one (strategy, commit) pair, so pinning them in a version-controlled
 file would rot on the next re-chunk.
 
+### Generation: cost and citation behaviour
+
+Answers are generated with `claude-opus-5` over the top spans from the best
+retrieval configuration, and every claim must cite the span number it came from.
+Measured over the full golden set, run 5:
+
+| | |
+|---|---|
+| Answers | 33 |
+| Cost per answer | **$0.0280** |
+| Total cost | $0.9251 |
+| Mean latency | 8.4 s |
+| Mean input / output tokens | 2284 / 665 |
+| Spans supplied that were cited | 127 / 165 (77%) |
+| Answers citing a span that did not exist | 0 |
+| Answers citing nothing at all | 0 |
+
+Cost per request is a question that gets asked directly, so it is measured
+rather than estimated. Abstained rows store NULL usage rather than zeros, so an
+abstention can never be averaged in as a free, instant answer.
+
+**23% of supplied spans are never cited.** That is a retrieval signal, not a
+generation fault: `rerank_top_n` is 5, and answers typically use fewer, so the
+surplus is paid for in input tokens on every single query. It is a config knob,
+so the sweep decides it, not a hand-tuned guess.
+
+**A bug worth recording, because it would have become a false headline.** The
+first run reported that 4 of 33 answers cited a span that was never supplied,
+which reads as a checkable hallucination. Every one was the citation parser
+mistaking bracketed integers in code for citations:
+
+```
+output.outputs[0].text
+cudagraph_capture_sizes=[1, 2, 4, 8, 16]
+```
+
+Both are real fragments from generated answers. Citations are only meaningful in
+prose, so fenced blocks and inline code spans are now stripped before parsing.
+After the fix the true count is zero, and the eight test cases guarding it are
+taken verbatim from those answers. Publishing the unfixed number would have
+been a hallucination claim about the model that was really a bug in the
+measurement.
+
 ### Retrieval: recall@k by chunking strategy and retrieval mode
 
 Both chunking strategies are indexed at the same time and queried identically,
@@ -300,6 +343,10 @@ uv run anchor golden propose    # retrieval evidence for each, for human review
 uv run anchor golden validate   # every expected document exists in the corpus
 
 uv run anchor eval-retrieval    # the recall@k sweep; writes a row to `runs`
+
+uv run anchor ask "what does max_num_seqs do"   # one cited answer
+uv run anchor golden sync                       # golden set into Postgres
+uv run anchor answer-golden --yes               # answer the whole set; costs money
 ```
 
 Re-running `ingest` stays on the commit already ingested. Advancing to the

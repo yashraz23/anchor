@@ -23,6 +23,15 @@ from anchor.tokenizer import Tokenizer
 # version strings and shapes that fill this corpus.
 _CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 
+# Fenced blocks and inline code spans, both stripped before citations are read.
+# The fence is captured by name and matched again at the close, so a shorter run
+# inside a longer block cannot end it early.
+_FENCED_CODE = re.compile(
+    r"^ {0,3}(?P<fence>`{3,}|~{3,}).*?(?:^ {0,3}(?P=fence)[`~]*[^\S\n]*$|\Z)",
+    re.DOTALL | re.MULTILINE,
+)
+_INLINE_CODE = re.compile(r"`+[^`\n]*`+")
+
 SYSTEM_PROMPT = """You answer questions about vLLM using only the numbered \
 context spans provided.
 
@@ -103,14 +112,31 @@ def build_prompt(
     return Prompt(system=SYSTEM_PROMPT, user=user, spans=tuple(spans))
 
 
+def strip_code(text: str) -> str:
+    """Remove fenced blocks and inline code spans, keeping everything else.
+
+    Citations are only meaningful in prose. Code is full of bracketed integers
+    that look exactly like citations: `output.outputs[0].text` and
+    `cudagraph_capture_sizes=[1, 2, 4, 8, 16]` both appeared in real answers and
+    were both read as citations to spans that did not exist. Every one of those
+    would have been reported as an invented source.
+
+    Replaced with a space rather than deleted, so a citation touching a code
+    span on either side does not fuse with its neighbour.
+    """
+    without_fences = _FENCED_CODE.sub(" ", text)
+    return _INLINE_CODE.sub(" ", without_fences)
+
+
 def parse_citations(answer: str) -> set[int]:
-    """Span numbers cited anywhere in the answer.
+    """Span numbers cited in the prose of an answer.
 
     Used by the grounding layer to route each claim to the span it names, and to
-    notice claims that cite nothing at all.
+    notice claims that cite nothing at all. Code is stripped first: see
+    strip_code for why that is not an optimisation but a correctness fix.
     """
     found: set[int] = set()
-    for match in _CITATION.finditer(answer):
+    for match in _CITATION.finditer(strip_code(answer)):
         for part in match.group(1).split(","):
             found.add(int(part.strip()))
     return found

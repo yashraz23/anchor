@@ -14,6 +14,7 @@ from anchor.generate.prompt import (
     format_span,
     invalid_citations,
     parse_citations,
+    strip_code,
 )
 from anchor.retrieve.search import Hit
 from tests.conftest import FakeTokenizer
@@ -139,3 +140,49 @@ def test_invalid_citations_catches_an_invented_source() -> None:
 
 def test_invalid_citations_catches_zero() -> None:
     assert invalid_citations("See [0].", span_count=3) == {0}
+
+
+# --------------------------------------------------------------------------- #
+# code is not citation                                                         #
+# --------------------------------------------------------------------------- #
+# Every case below is taken verbatim from a real generated answer. Before the
+# fix, all four were reported as citations to spans that were never supplied,
+# which would have been published as invented sources.
+def test_python_indexing_in_a_fenced_block_is_not_a_citation() -> None:
+    answer = "Use it like this [2].\n\n```python\nprint(output.outputs[0].text)\n```\n"
+    assert parse_citations(answer) == {2}
+
+
+def test_a_list_literal_in_inline_code_is_not_a_citation() -> None:
+    answer = "Set `cudagraph_capture_sizes=[1, 2, 4, 8, 16]` to tune it [3]."
+    assert parse_citations(answer) == {3}
+
+
+def test_indexing_in_inline_code_is_not_a_citation() -> None:
+    answer = "Read it via `output.outputs[0].text` [1]."
+    assert parse_citations(answer) == {1}
+
+
+def test_invalid_citations_no_longer_fire_on_code() -> None:
+    answer = "See `sizes=[8, 16]` and the span [2]."
+    assert invalid_citations(answer, span_count=5) == set()
+
+
+def test_a_citation_beside_inline_code_still_parses() -> None:
+    """Stripping must not swallow a citation that touches a code span."""
+    assert parse_citations("Pass `--enforce-eager`[4] to disable it.") == {4}
+
+
+def test_a_tilde_fence_is_stripped_too() -> None:
+    answer = "Prose [1].\n\n~~~python\nx = y[0]\n~~~\n"
+    assert parse_citations(answer) == {1}
+
+
+def test_an_unterminated_fence_is_stripped_to_the_end() -> None:
+    """A truncated answer must not leak its code into the citation set."""
+    answer = "Prose [1].\n\n```python\nx = y[0]\n"
+    assert parse_citations(answer) == {1}
+
+
+def test_strip_code_leaves_prose_intact() -> None:
+    assert "the flag" in strip_code("the flag `--x` is set")
