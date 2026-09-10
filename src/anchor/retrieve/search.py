@@ -112,8 +112,14 @@ def search(
     embedder: Embedder,
     strategy: str,
     mode: RetrievalMode | None = None,
+    limit: int | None = None,
 ) -> list[Hit]:
     """Retrieve for one query under the configured mode.
+
+    `limit` overrides how many spans come back. Evaluation needs it: recall@k is
+    reported out to k=20, while the generator is handed rerank_top_n spans. They
+    are different questions, so the eval asks for depth explicitly rather than
+    moving rerank_top_n, which is an experiment variable in its own right.
 
     Hybrid fuses the two lists with RRF and then, when reranking is on, hands
     the fused top-k to a cross-encoder. The bi-encoder scores query and passage
@@ -160,5 +166,6 @@ def search(
         from anchor.retrieve.rerank import rerank
 
         hits = rerank(query, hits, settings)
+        return hits[: limit if limit is not None else cfg.rerank_top_n]
 
-    return hits[: cfg.rerank_top_n] if cfg.use_rerank else hits
+    return hits[:limit] if limit is not None else hits

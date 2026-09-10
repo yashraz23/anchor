@@ -300,6 +300,29 @@ def golden_validate() -> None:
     console.print("[green]every expected document is present in the corpus[/green]")
 
 
+@app.command("eval-retrieval")
+def eval_retrieval_cmd(
+    out: str = typer.Option("", help="Write the markdown table here as well."),
+) -> None:
+    """Run the recall@k sweep over the golden set and print the table.
+
+    Writes a runs row with the full config and the git SHA, so the numbers can
+    be traced back to what produced them.
+    """
+    _configure_logging()
+    from anchor.evaluate.sweep import render_report, run_retrieval_sweep
+
+    settings = get_settings()
+    report = run_retrieval_sweep(settings)
+    rendered = render_report(report, settings)
+
+    console.print(rendered, markup=False)
+    if out:
+        Path(out).write_text(f"{rendered}\n", encoding="utf-8")
+        console.print()
+        console.print(f"wrote {out}")
+
+
 @app.command("integrity")
 def integrity_cmd() -> None:
     """Measure how many fenced code blocks survive each chunking strategy whole.

@@ -16,7 +16,7 @@ unusual for a RAG evaluation project. A second property falls out of the same
 choice: vLLM releases fast and its docs go stale, so chunks are version-tagged
 and the system can flag retrieved guidance that describes outdated behaviour.
 
-> **Status: week 1, in progress.** Tables still marked TODO are empty on
+> **Status: week 2, in progress.** Tables still marked TODO are empty on
 > purpose. Numbers appear here only once the harness has produced them.
 
 ---
@@ -153,18 +153,65 @@ file would rot on the next re-chunk.
 ### Retrieval: recall@k by chunking strategy and retrieval mode
 
 Both chunking strategies are indexed at the same time and queried identically,
-so the comparison is like-for-like.
+so the comparison is like-for-like. Recall is measured at the **document**
+level: of the top k retrieved chunks, did any come from a document the golden
+entry names? The two strategies cut the same document into different numbers of
+pieces, so a chunk-level score would reward whichever produces more chunks
+rather than whichever retrieves the right material.
 
 | Chunking | Retrieval | recall@1 | recall@3 | recall@5 | recall@10 | recall@20 |
 |---|---|---|---|---|---|---|
-| fixed | dense | TODO | TODO | TODO | TODO | TODO |
-| fixed | sparse | TODO | TODO | TODO | TODO | TODO |
-| fixed | hybrid (RRF) | TODO | TODO | TODO | TODO | TODO |
-| fixed | hybrid + rerank | TODO | TODO | TODO | TODO | TODO |
-| structure_aware | dense | TODO | TODO | TODO | TODO | TODO |
-| structure_aware | sparse | TODO | TODO | TODO | TODO | TODO |
-| structure_aware | hybrid (RRF) | TODO | TODO | TODO | TODO | TODO |
-| structure_aware | hybrid + rerank | TODO | TODO | TODO | TODO | TODO |
+| `fixed` | dense | 0.36 | 0.60 | 0.74 | 0.81 | 0.81 |
+| `fixed` | sparse | 0.17 | 0.26 | 0.26 | 0.26 | 0.29 |
+| `fixed` | hybrid (RRF) | 0.43 | 0.64 | 0.79 | 0.83 | 0.83 |
+| `fixed` | hybrid (RRF) + rerank | 0.45 | 0.71 | 0.74 | 0.81 | 0.83 |
+| `structure_aware` | dense | 0.52 | 0.67 | 0.69 | 0.76 | 0.88 |
+| `structure_aware` | sparse | 0.21 | 0.31 | 0.31 | 0.31 | 0.33 |
+| `structure_aware` | hybrid (RRF) | 0.52 | 0.74 | 0.74 | 0.79 | 0.90 |
+| `structure_aware` | **hybrid (RRF) + rerank** | **0.60** | **0.86** | **0.88** | **0.88** | **0.90** |
+
+Run 2, commit `9012b8d`, 21 golden questions. Reproduce with
+`uv run anchor eval-retrieval`.
+
+**Read the sample size before the numbers.** 21 questions means one question is
+worth 0.048 recall, so no two cells differing by less than about 0.10 should be
+treated as distinct. The set is on its way to 60-80; these are directional.
+
+Because every cell runs the same questions, the paired record is the honest
+comparison, and it is stronger than the difference of means:
+
+| k | `structure_aware` better | `fixed` better | same |
+|---|---|---|---|
+| 1 | 6 | 1 | 14 |
+| 3 | 5 | 0 | 16 |
+| 5 | 5 | 0 | 16 |
+| 10 | 3 | 0 | 18 |
+| 20 | 3 | 0 | 18 |
+
+Structure-aware chunking never loses a question at k of 3 or more. That is a
+directional result rather than a significant one at this sample size, but it is
+a much better claim than "0.86 versus 0.71", which is five questions.
+
+What the table supports:
+
+- **Hybrid beats dense alone, and the gap is small.** Fusion adds 0.02 to 0.07
+  depending on depth. It earns its place mainly through the questions dense
+  retrieval misses entirely, not by reordering the ones it already finds.
+- **Sparse alone is weak here, at 0.29 to 0.33 recall@20.** That is not a bug.
+  These are natural-language questions from issue titles, and they share almost
+  no vocabulary with the documentation. Keyword search cannot match
+  "concurrent sequences" to `max_num_seqs`.
+- **Reranking helps structure-aware and does not help fixed.** It lifts
+  structure-aware from 0.74 to 0.88 at recall@5, but moves fixed from 0.79 to
+  0.74. A cross-encoder scores a query against a passage, and a fixed-size
+  window that starts and ends mid-sentence is a worse passage to score. The
+  chunking strategy and the reranker are not independent choices.
+- **Two questions are never retrieved by any configuration.** Both were flagged
+  as expected failures during curation, before this ran:
+  `vllm-6660-disable-logging`, whose answer lives only in `vllm/envs.py` because
+  the env-var page is an mkdocs stub, and
+  `vllm-23108-gpt-oss-builtin-python-tool`. Keeping known failures in the set is
+  what lets it measure anything.
 
 ### Grounding: strictness versus completeness
 
@@ -246,6 +293,8 @@ uv run anchor search "what does max_num_seqs do and what is its default"
 uv run anchor golden harvest    # candidate questions from real vLLM issues (needs gh)
 uv run anchor golden propose    # retrieval evidence for each, for human review
 uv run anchor golden validate   # every expected document exists in the corpus
+
+uv run anchor eval-retrieval    # the recall@k sweep; writes a row to `runs`
 ```
 
 Re-running `ingest` stays on the commit already ingested. Advancing to the
