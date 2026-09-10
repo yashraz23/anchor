@@ -430,6 +430,9 @@ def oracle_build_cmd() -> None:
 def ground_cmd(
     run: int = typer.Option(0, help="Answer run to score. Defaults to the latest."),
     out: str = typer.Option("", help="Write the tradeoff table here as well."),
+    no_judge: bool = typer.Option(
+        False, "--no-judge", help="Skip the LLM judge. Free, but similarity only."
+    ),
 ) -> None:
     """Score stored answers and sweep the abstention threshold.
 
@@ -441,6 +444,8 @@ def ground_cmd(
     from anchor.ground.tradeoff import render_curve
 
     settings = get_settings()
+    if no_judge:
+        settings.ground.use_llm_judge = False
     report = ground_run(settings, run or None)
 
     console.print(f"[bold]grounded run {report.run_id}[/bold]")
@@ -449,6 +454,19 @@ def ground_cmd(
     console.print(f"  claims citing nothing {report.uncited_claims}")
     console.print(f"  answers the oracle could check  {report.oracle_checked}")
     console.print(f"  answers it contradicted         {report.oracle_contradicted}")
+    if report.judged_claims:
+        console.print()
+        console.print(f"  claims judged         {report.judged_claims}")
+        for name, count in sorted(report.judge_verdicts.items()):
+            console.print(f"    {name:<14} {count}")
+        console.print(f"  judge cost            ${report.judge_cost_usd:.4f}")
+        decided = report.agree + report.judge_stricter + report.attribution_stricter
+        if decided:
+            console.print(
+                f"  agrees with similarity  {report.agree}/{decided} ({report.agree / decided:.0%})"
+            )
+            console.print(f"    judge stricter        {report.judge_stricter}")
+            console.print(f"    similarity stricter   {report.attribution_stricter}")
     console.print()
 
     table = render_curve(report.points)

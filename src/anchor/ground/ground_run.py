@@ -22,6 +22,7 @@ from anchor import db
 from anchor.config import Settings, Verdict, Verifier
 from anchor.ground.attribution import Attribution, attribute_claims
 from anchor.ground.claims import extract_claims
+from anchor.ground.judge import AnthropicJudge, Judge, agreement, judge_cost
 from anchor.ground.tradeoff import ScoredAnswer, TradeoffPoint, sweep
 from anchor.ground.verify import verify_with_oracle
 from anchor.index.embed import Embedder
@@ -45,6 +46,13 @@ class GroundReport:
     uncited_claims: int = 0
     oracle_checked: int = 0
     oracle_contradicted: int = 0
+    judged_claims: int = 0
+    judge_cost_usd: float = 0.0
+    # Judge verdict counts, and how often it agrees with span attribution.
+    judge_verdicts: dict[str, int] = field(default_factory=dict)
+    agree: int = 0
+    judge_stricter: int = 0
+    attribution_stricter: int = 0
     points: list[TradeoffPoint] = field(default_factory=list)
 
 
@@ -103,8 +111,20 @@ def _verdict_for(attribution: Attribution, oracle_contradicted: bool) -> tuple[s
     return verdict.value, Verifier.SPAN_ATTRIBUTION.value
 
 
-def ground_run(settings: Settings, run_id: int | None = None) -> GroundReport:
-    """Score every answer in a run and sweep the abstention threshold."""
+def ground_run(
+    settings: Settings,
+    run_id: int | None = None,
+    judge: Judge | None = None,
+) -> GroundReport:
+    """Score every answer in a run and sweep the abstention threshold.
+
+    The judge is optional because it costs money. Without it the
+    cited-but-unsupported column is a similarity floor; with it, it is a
+    semantic verdict, and only the judge can catch a claim that sits close to
+    its span while stating a different number.
+    """
+    if judge is None and settings.ground.use_llm_judge:
+        judge = AnthropicJudge(settings)
     embedder = Embedder(
         settings.index.embedding_model,
         normalize=settings.index.normalize_embeddings,
@@ -153,6 +173,25 @@ def ground_run(settings: Settings, run_id: int | None = None) -> GroundReport:
                 claims, spans, embedder, settings.ground.support_threshold
             )
 
+            judged: dict[int, Verdict] = {}
+            if judge is not None and claims:
+                result = judge.judge(claims, spans)
+                judged = dict(result.verdicts)
+                report.judged_claims += len(result.verdicts)
+                cost = judge_cost(result, settings.ground.judge_model)
+                if cost is not None:
+                    report.judge_cost_usd += cost
+                for judged_verdict in result.verdicts.values():
+                    key = judged_verdict.value
+                    report.judge_verdicts[key] = report.judge_verdicts.get(key, 0) + 1
+                agreed, stricter, looser = agreement(
+                    result.verdicts,
+                    {a.claim.ordinal: a.supported for a in attributions},
+                )
+                report.agree += agreed
+                report.judge_stricter += stricter
+                report.attribution_stricter += looser
+
             oracle = verify_with_oracle(conn, answer_text, settings.ground, version)
             contradicted = oracle.verdict is Verdict.CONTRADICTED
             if oracle.checkable:
@@ -162,6 +201,12 @@ def ground_run(settings: Settings, run_id: int | None = None) -> GroundReport:
 
             for attribution in attributions:
                 verdict, verifier = _verdict_for(attribution, contradicted)
+                # The judge outranks similarity where it has an opinion: it read
+                # the span, while attribution only measured distance to it. The
+                # oracle still outranks both, since it consulted the source.
+                if not contradicted and attribution.claim.ordinal in judged:
+                    verdict = judged[attribution.claim.ordinal].value
+                    verifier = Verifier.LLM_JUDGE.value
                 supporting = (
                     spans[attribution.best_span - 1].chunk_id
                     if attribution.best_span is not None and attribution.best_span - 1 < len(spans)

@@ -375,24 +375,52 @@ knee is around 0.60 to 0.70, where the system still answers 64% to 79% of
 questions while more than halving the uncited rate. There is no threshold at
 which strictly unsupported claims are a problem, because there was only ever one.
 
-**Limits of this measurement, stated plainly.** Attribution is cosine
-similarity between a claim and its cited span, which is a proxy for support and
-not support itself: a claim can sit close to its span and still invert its
-meaning. That specific case is what the LLM judge is for, and the judge is not
-built yet, so the "cited but unsupported" column is currently a similarity
-floor rather than a semantic verdict. The symbol oracle covers the checkable
-subset exactly and found no contradictions across the 3 answers it had
-jurisdiction over.
+**How the columns are computed.** The curve thresholds on span attribution,
+which is free, so the whole sweep is a re-thresholding of one pass. The LLM
+judge scores the same claims independently and agrees on 98% of them; see
+verifier agreement below. The symbol oracle covers the checkable subset exactly
+and found no contradictions across the 3 answers it had jurisdiction over.
 
 ### Verifier agreement
 
-How often the symbol oracle and the LLM judge reach the same verdict on the
-claims both can see. Where they disagree, the oracle is right by construction,
-which puts a number on the LLM judge's error rate.
+Three verifiers, deliberately ordered cheapest-first. The symbol oracle is exact
+and free but only covers checkable names. Span attribution is cheap but measures
+similarity, which is a proxy for support. The LLM judge reads the span and the
+claim together and is the only one that can catch a claim sitting close to its
+span while stating something different.
 
-| Verifier | Claims judged | Agreement with oracle | Notes |
+Over 306 claims from 33 answers, run 5:
+
+| Verifier | Claims judged | Cost | Result |
 |---|---|---|---|
-| TODO | TODO | TODO | TODO |
+| Symbol oracle | 3 answers in jurisdiction | free | 0 contradictions |
+| Span attribution | 306 | free | 193 supported |
+| LLM judge | 306 | $1.30 | 194 supported, 31 unsupported, 81 unverifiable |
+
+**The two agree on 301 of 306 claims (98%)** on the binary question of whether a
+claim is supported. The judge was stricter on 2, similarity on 3. That number is
+the phase 2 argument in miniature: a free check already reproduces a $1.30 one
+almost everywhere, and the interesting question is whether the remaining 2%
+matters.
+
+**No claim cited a span that failed to support it.** Both verifiers agree, and
+this is the strongest single result in the grounding layer: across 306 claims,
+zero cases of the answer pointing at evidence that does not say what it claims.
+Every one of the judge's 31 `unsupported` verdicts is on a claim that carried no
+citation at all.
+
+What the judge adds is a distinction similarity cannot make. It splits the 112
+uncited claims into 31 genuine assertions that should have carried a citation
+and 81 that are not factual assertions about vLLM at all, mostly the model
+noting the limits of its own evidence.
+
+**Verified on a constructed case, because the real answers contain none.** Given
+a span reading "Default 128" and the claim "max_num_seqs defaults to 512", the
+judge returns `contradicted` with the reason "The span states the default is 128,
+not 512". Cosine similarity between those two is high, since they differ by one
+token. This is the failure mode the judge exists for, and the reason the
+cited-but-unsupported column is a semantic verdict rather than a similarity
+floor.
 
 ---
 
