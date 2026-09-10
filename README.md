@@ -16,8 +16,11 @@ unusual for a RAG evaluation project. A second property falls out of the same
 choice: vLLM releases fast and its docs go stale, so chunks are version-tagged
 and the system can flag retrieved guidance that describes outdated behaviour.
 
-> **Status: week 2, in progress.** Tables still marked TODO are empty on
-> purpose. Numbers appear here only once the harness has produced them.
+> **Status: phase 1 complete.** Every number below was measured by the harness
+> in this repository and can be reproduced from the commands in Quickstart. Two
+> steps are deliberately left un-triggered because they publish under a personal
+> account: the Hugging Face Spaces deployment and the vLLM documentation pull
+> request, drafted in [`contrib/vllm-docs-pr/`](contrib/vllm-docs-pr/).
 
 ---
 
@@ -589,15 +592,37 @@ table in this README can be traced back to the commit that produced it.
 | `src/anchor/evaluate/` | Golden set, ragas, judge, sweep runner |
 | `data/golden/` | The golden set, version-controlled |
 
-## Roadmap
+## Status
 
-- **Week 1.** Ingestion with version tagging, both chunking strategies, hybrid
-  retrieval and reranking. Exit criterion: the recall@k table above is filled.
-- **Week 2.** A golden set of 60 to 80 questions sourced from real vLLM GitHub
-  issues and discussions, claim extraction, span attribution, the symbol oracle,
-  the ragas triad, and evals in CI. Exit criterion: the tradeoff curve.
-- **Week 3.** FastAPI, Docker, a Gradio demo on Hugging Face Spaces, and a
-  documentation pull request against vLLM using gaps the harness exposed.
+| Phase 1 | |
+|---|---|
+| Ingestion, version-tagged, 1729 documents | done |
+| Both chunking strategies, compared | done |
+| Hybrid retrieval, RRF, cross-encoder rerank | done |
+| Golden set from real vLLM issues | 33 of a 60-80 target |
+| Generation with inline citation | done |
+| Symbol oracle, 13369 symbols | done |
+| Claim extraction, span attribution, LLM judge | done |
+| Tradeoff curve | done |
+| Evals in CI | done, over a fixture corpus |
+| FastAPI and Gradio demo | done |
+| Hugging Face Spaces deployment | needs an account, not triggered |
+| vLLM documentation PR | drafted, not filed |
+
+Two things are honestly incomplete. The golden set is at 33 rather than 60 to
+80, so every result on it is directional rather than tight; the paired chunking
+comparison is significant anyway, but the tradeoff curve would move with more
+questions. And CI evals run over a fixture corpus rather than the real one,
+which proves the pipeline works end to end but not that recall on the full
+corpus has held.
+
+**Phase 2** distils the LLM judge into a LoRA-tuned local model. The case for it
+is already measured: span attribution reproduces the judge on 98% of claims, and
+`claims` holds the labelled rows to train on.
+
+**Phase 3** serves the generator on k3s with a quantized model. Note the local
+GPU is a 12 GB RTX 5070 Ti Laptop, so quantization is a requirement there rather
+than an experiment.
 
 Phase 2 distils the LLM judge into a LoRA-tuned local model and reports
 agreement against cost. Phase 3 serves the generator on k3s with a quantized

@@ -217,4 +217,20 @@ RAG · hybrid retrieval · reciprocal rank fusion · cross-encoder reranking · 
 - Python 3.11.16 is installed and pinned via `uv python install 3.11`. The system Python is 3.14, which the project deliberately does not use.
 - Postgres runs on host port **5433**, not 5432, so it cannot collide with any other local Postgres.
 - The local GPU is an **RTX 5070 Ti Laptop with 12 GB VRAM**. Phase 3 must plan around 12 GB, not the 16 GB of the desktop part: `Qwen2.5-7B-Instruct` needs quantization (AWQ or GPTQ) to serve comfortably, which is convenient because quantization is a phase 3 deliverable anyway.
-- `gh` is not installed, so GitHub operations are manual until it is.
+- `gh` is installed and authenticated as `yashraz23`.
+
+## Decisions taken that differ from this document
+
+- **ragas is not used.** Every published version through 0.4.3 hard-requires
+  `langchain`, `langchain-community`, `langchain-openai` and `openai`, and the
+  installed version failed to import. This file names ragas *and* forbids
+  LangChain; those cannot both hold. The triad is implemented in
+  `anchor/evaluate/triad.py`. Reversing this means accepting LangChain.
+- **Claim extraction is deterministic**, not model-driven: the generator already
+  cites a span per claim, so the pairs are in the text. Keeps runs reproducible
+  and re-thresholding free.
+- **The symbol oracle rules only on CLI flags inside a vLLM invocation**, and
+  does not adjudicate config keys. Judging every flag and backticked identifier
+  gave a 42% false "not found" rate on real answers.
+- **CI evals run over `tests/fixtures/corpus`**, not the real corpus, which
+  would take ~15 minutes per run to build.
