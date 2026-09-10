@@ -1,0 +1,1438 @@
+<title>Anchor Phase One</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+
+<style>
+  :root {
+    /* Light palette. Neutrals carry a slight blue bias so they read as chosen
+       against the teal, rather than as default grey. */
+    --ground:      #F6F8FA;
+    --surface:     #FFFFFF;
+    --surface-2:   #EEF2F6;
+    --ink:         #111820;
+    --ink-2:       #3B4756;
+    --muted:       #64707E;
+    --rule:        #DBE2E9;
+    --rule-strong: #C3CDD7;
+
+    --accent:      #0F6F7A;
+    --accent-soft: #E2F0F1;
+    --accent-ink:  #0B565F;
+
+    --good:        #2C7A57;
+    --good-soft:   #E3F1EA;
+    --warn:        #8A6410;
+    --warn-soft:   #F7EEDC;
+    --bad:         #A03A3A;
+    --bad-soft:    #F6E5E5;
+
+    --shadow: 0 1px 2px rgba(17, 24, 32, .05), 0 8px 24px -16px rgba(17, 24, 32, .28);
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0B1015;
+      --surface:     #121A21;
+      --surface-2:   #18222B;
+      --ink:         #E4ECF2;
+      --ink-2:       #BFCDD9;
+      --muted:       #8598A8;
+      --rule:        #223039;
+      --rule-strong: #33454F;
+
+      --accent:      #46B4BF;
+      --accent-soft: #123034;
+      --accent-ink:  #7FD0D8;
+
+      --good:        #5FBF90;
+      --good-soft:   #102A20;
+      --warn:        #D6A94E;
+      --warn-soft:   #2B2415;
+      --bad:         #E0797A;
+      --bad-soft:    #2E1A1B;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px -18px rgba(0,0,0,.8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0B1015;
+    --surface:     #121A21;
+    --surface-2:   #18222B;
+    --ink:         #E4ECF2;
+    --ink-2:       #BFCDD9;
+    --muted:       #8598A8;
+    --rule:        #223039;
+    --rule-strong: #33454F;
+
+    --accent:      #46B4BF;
+    --accent-soft: #123034;
+    --accent-ink:  #7FD0D8;
+
+    --good:        #5FBF90;
+    --good-soft:   #102A20;
+    --warn:        #D6A94E;
+    --warn-soft:   #2B2415;
+    --bad:         #E0797A;
+    --bad-soft:    #2E1A1B;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px -18px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  @media (min-width: 1060px) {
+    .page {
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: 56px;
+      padding: 0 32px 120px;
+    }
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    grid-column: 1 / -1;
+    padding: 56px 0 32px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 5.2vw, 52px);
+    line-height: 1.08;
+    letter-spacing: -.02em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: var(--measure);
+    margin: 0 0 28px;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .meta-row b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---------- section rail ---------- */
+  .rail { display: none; }
+  @media (min-width: 1060px) {
+    .rail {
+      display: block;
+      grid-column: 1;
+      align-self: start;
+      position: sticky;
+      top: 24px;
+      padding-top: 44px;
+    }
+    .rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+    .rail a {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      display: block;
+      line-height: 1.35;
+      border-left: 2px solid var(--rule);
+      padding-left: 11px;
+    }
+    .rail a:hover, .rail a:focus-visible { color: var(--accent); border-left-color: var(--accent); }
+  }
+
+  main { grid-column: 1 / -1; min-width: 0; }
+  @media (min-width: 1060px) { main { grid-column: 2; } }
+
+  section { padding-top: 60px; scroll-margin-top: 24px; }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 27px;
+    letter-spacing: -.012em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .section-note {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 26px;
+    letter-spacing: .02em;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 17px;
+    margin: 34px 0 10px;
+    color: var(--ink);
+  }
+  p { max-width: var(--measure); margin: 0 0 16px; }
+  ul, ol.body-list { max-width: var(--measure); padding-left: 20px; margin: 0 0 16px; }
+  li { margin-bottom: 9px; }
+  strong { font-weight: 600; }
+  a { color: var(--accent-ink); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: .08em .34em;
+  }
+
+  /* ---------- headline metric strip ---------- */
+  .headline {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 28px 0 8px;
+  }
+  .headline div { background: var(--surface); padding: 18px 18px 16px; }
+  .headline .k {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 7px;
+  }
+  .headline .v {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 25px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.1;
+    margin: 0;
+  }
+  .headline .s { font-size: 12.5px; color: var(--muted); margin: 5px 0 0; line-height: 1.4; }
+
+  /* ---------- tables ---------- */
+  .scroller { overflow-x: auto; margin: 0 0 20px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-size: 12.5px;
+    color: var(--muted);
+    padding: 11px 16px 13px;
+    border-top: 1px solid var(--rule);
+    line-height: 1.5;
+  }
+  th, td {
+    padding: 9px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    background: var(--surface-2);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tr.best td { background: var(--accent-soft); font-weight: 600; }
+  tr.best td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  td.name { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 99px;
+    letter-spacing: .02em;
+  }
+  .pill.ok   { background: var(--good-soft); color: var(--good); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.bad  { background: var(--bad-soft);  color: var(--bad); }
+
+  /* ---------- callout ---------- */
+  .callout {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    padding: 18px 20px 4px;
+    margin: 22px 0;
+    max-width: var(--measure);
+  }
+  .callout.finding { border-left-color: var(--good); }
+  .callout.caveat  { border-left-color: var(--warn); }
+  .callout .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 7px;
+  }
+  .callout p { margin-bottom: 14px; }
+
+  /* ---------- pipeline ---------- */
+  .stages { list-style: none; margin: 26px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .stages li { background: var(--surface); padding: 15px 18px; display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 14px; margin: 0; }
+  .stages .n { font-family: var(--mono); font-size: 12px; color: var(--accent); padding-top: 3px; font-weight: 600; }
+  .stages h4 { margin: 0 0 3px; font-size: 15px; font-weight: 600; font-family: var(--sans); }
+  .stages p { margin: 0; font-size: 14px; color: var(--ink-2); max-width: 60ch; }
+
+  /* ---------- code block ---------- */
+  pre {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.65;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 15px 17px;
+    overflow-x: auto;
+    margin: 0 0 18px;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  pre .c { color: var(--muted); }
+
+  /* ---------- chart ---------- */
+  figure { margin: 26px 0 8px; }
+  .chart-wrap { border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); padding: 18px 12px 8px; overflow-x: auto; }
+  svg { display: block; max-width: 100%; height: auto; }
+  figcaption { font-size: 12.5px; color: var(--muted); margin-top: 11px; line-height: 1.5; max-width: var(--measure); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 12px 4px 2px; font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 15px; height: 3px; border-radius: 2px; display: inline-block; }
+
+  /* ---------- steps for the guide ---------- */
+  .step { border-top: 1px solid var(--rule); padding: 26px 0 4px; }
+  .step:first-of-type { border-top: none; }
+  .step-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .step-head h3 { margin: 0; }
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--rule-strong);
+    border-radius: 99px;
+    padding: 1px 8px;
+  }
+  .tag.you { color: var(--warn); border-color: var(--warn); }
+
+  footer {
+    grid-column: 1 / -1;
+    margin-top: 76px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  /* ---------- print / save-as-PDF ----------
+     Forced to the light palette: a dark ground prints as a solid block of ink
+     and the report is meant to be readable on paper. */
+  @media print {
+    :root, :root[data-theme="dark"] {
+      --ground: #FFFFFF;
+      --surface: #FFFFFF;
+      --surface-2: #F2F5F8;
+      --ink: #111820;
+      --ink-2: #33404E;
+      --muted: #5A6773;
+      --rule: #CFD8E0;
+      --rule-strong: #AEBBC6;
+      --accent: #0B565F;
+      --accent-soft: #EAF3F4;
+      --accent-ink: #0B565F;
+      --good: #216B4A;
+      --good-soft: #EDF5F1;
+      --warn: #7A5709;
+      --warn-soft: #F8F1E2;
+      --bad: #8C3030;
+      --bad-soft: #F8EAEA;
+      --shadow: none;
+    }
+
+    @page { margin: 16mm 14mm; }
+
+    body { background: #FFFFFF; font-size: 10.5pt; line-height: 1.5; }
+    .page { display: block; max-width: none; padding: 0; }
+    .rail { display: none; }
+    main { grid-column: auto; }
+
+    .masthead { padding-top: 0; }
+    h1 { font-size: 30pt; }
+    .standfirst { font-size: 12pt; }
+
+    /* Keep a heading with the content it introduces, and never split a table
+       row or a callout across a page. */
+    section { padding-top: 22pt; break-inside: auto; }
+    h2, h3 { break-after: avoid; }
+    .headline, .callout, .stages li, figure, .step { break-inside: avoid; }
+    table { break-inside: auto; }
+    tr, caption { break-inside: avoid; }
+    thead { display: table-header-group; }
+    pre { break-inside: avoid; white-space: pre-wrap; word-break: break-word; }
+
+    /* On paper there is no scrolling, so let wide tables wrap instead. */
+    .scroller { overflow: visible; }
+    th, td { white-space: normal; }
+    td.name { word-break: break-word; }
+
+    .headline { grid-template-columns: repeat(3, 1fr); }
+    a { color: var(--ink); text-decoration: none; }
+    footer { break-inside: avoid; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Phase 1 report &middot; 10 September 2026</p>
+    <h1>Anchor</h1>
+    <p class="standfirst">
+      A retrieval system over vLLM's documentation that refuses to answer when it
+      cannot show its work. Every claim is traced to the span it cites; claims that
+      name a CLI flag are checked against vLLM's actual source. The deliverable is
+      not the chatbot — it is the measured curve between how strict the system is
+      and how often it answers at all.
+    </p>
+    <div class="meta-row">
+      <span><b>23</b> commits</span>
+      <span><b>294</b> tests passing</span>
+      <span><b>6,632</b> lines of source</span>
+      <span><b>3,106</b> lines of tests</span>
+      <span>corpus pinned at <b>v0.28.1rc0</b> / <b>65f3fca5</b></span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Sections">
+    <ol>
+      <li><a href="#what">What it is</a></li>
+      <li><a href="#results">Results at a glance</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#corpus">The corpus finding</a></li>
+      <li><a href="#chunking">Chunking</a></li>
+      <li><a href="#retrieval">Retrieval</a></li>
+      <li><a href="#generation">Generation</a></li>
+      <li><a href="#oracle">The symbol oracle</a></li>
+      <li><a href="#tradeoff">The tradeoff curve</a></li>
+      <li><a href="#verifiers">Verifier agreement</a></li>
+      <li><a href="#triad">Triad &amp; ragas</a></li>
+      <li><a href="#bugs">Bugs worth knowing</a></li>
+      <li><a href="#decisions">Decisions vs. the spec</a></li>
+      <li><a href="#notdone">What is not done</a></li>
+      <li><a href="#guide">Guide: what remains</a></li>
+      <li><a href="#reference">Command reference</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ============ WHAT ============ -->
+    <section id="what">
+      <h2>What it is</h2>
+      <p class="section-note">the thesis, in one page</p>
+
+      <p>
+        Most retrieval demos answer a question and cite a source. Anchor does that,
+        then asks a harder question: <em>does the cited source actually say this?</em>
+        Three verifiers answer it, ordered cheapest first.
+      </p>
+
+      <ul>
+        <li>
+          <strong>The symbol oracle</strong> is exact and free. <code>--max-num-seqs</code>
+          either exists in vLLM's argument parser at a pinned commit or it does not,
+          and no model's opinion changes that. This is what makes a subset of the
+          faithfulness checks ground-truthed rather than judged — unusual for a RAG
+          evaluation project, and only possible because the corpus is code.
+        </li>
+        <li>
+          <strong>Span attribution</strong> is free but measures similarity, which is a
+          proxy for support rather than support itself.
+        </li>
+        <li>
+          <strong>An LLM judge</strong> reads claim and span together. It is the only
+          one that catches a claim sitting close to its span while stating a different
+          number.
+        </li>
+      </ul>
+
+      <p>
+        Answers whose claims cannot be supported are withheld rather than guessed. The
+        threshold that decides this is a config value, and sweeping it produces the
+        curve this project exists to measure.
+      </p>
+    </section>
+
+    <!-- ============ RESULTS ============ -->
+    <section id="results">
+      <h2>Results at a glance</h2>
+      <p class="section-note">every figure below is reproducible from the repository</p>
+
+      <div class="headline">
+        <div>
+          <p class="k">Retrieval recall@3</p>
+          <p class="v">0.90</p>
+          <p class="s">structure-aware, hybrid + rerank, 52 questions</p>
+        </div>
+        <div>
+          <p class="k">Chunking, sign test</p>
+          <p class="v">p = 0.0001</p>
+          <p class="s">15 wins, 0 losses at k=3</p>
+        </div>
+        <div>
+          <p class="k">Unsupported claims</p>
+          <p class="v">1 / 496</p>
+          <p class="s">cited a span that does not support it</p>
+        </div>
+        <div>
+          <p class="k">Cost per answer</p>
+          <p class="v">$0.030</p>
+          <p class="s">9.0 s mean latency, Claude Opus 5</p>
+        </div>
+        <div>
+          <p class="k">Verifier agreement</p>
+          <p class="v">98%</p>
+          <p class="s">free check vs. paid judge, 306 claims</p>
+        </div>
+        <div>
+          <p class="k">Symbols in the oracle</p>
+          <p class="v">13,369</p>
+          <p class="s">433 of them CLI flags</p>
+        </div>
+      </div>
+      <p class="section-note" style="margin-top:14px">
+        Corpus: 1,729 documents &middot; 12,610 chunks &middot; 52 golden questions &middot; 496 scored claims
+      </p>
+    </section>
+
+    <!-- ============ HOW ============ -->
+    <section id="how">
+      <h2>How it works</h2>
+      <p class="section-note">seven stages, each with its own CLI command</p>
+
+      <p>
+        The numbering here is real: each stage consumes the previous stage's output,
+        and every stage after the first pins itself to the commit the corpus was
+        ingested at.
+      </p>
+
+      <ol class="stages">
+        <li><span class="n">01</span><div>
+          <h4>Ingest</h4>
+          <p>Clone vLLM at a pinned commit as a blobless partial clone. Parse docs, README and public docstrings. Every document records its version and commit, which is what later makes staleness detectable.</p>
+        </div></li>
+        <li><span class="n">02</span><div>
+          <h4>Chunk</h4>
+          <p>Two strategies, both written to the database at once so they can be queried identically: a naive 512-token sliding window, and a structure-aware splitter that never splits a fenced code block.</p>
+        </div></li>
+        <li><span class="n">03</span><div>
+          <h4>Index</h4>
+          <p>Embed with <code>bge-small-en-v1.5</code> into pgvector with an HNSW index, and build the Postgres full-text vector in the same row. One datastore for dense and sparse means hybrid search is a single SQL statement.</p>
+        </div></li>
+        <li><span class="n">04</span><div>
+          <h4>Retrieve</h4>
+          <p>Dense and sparse top-k, fused with Reciprocal Rank Fusion, then reranked by a <code>bge-reranker-base</code> cross-encoder over the shortlist only.</p>
+        </div></li>
+        <li><span class="n">05</span><div>
+          <h4>Generate</h4>
+          <p>Numbered context spans, with the model required to cite span numbers inline. That requirement is not cosmetic — it is what makes every downstream check possible.</p>
+        </div></li>
+        <li><span class="n">06</span><div>
+          <h4>Ground</h4>
+          <p>Split the answer into claims, score each against the span it cited, route checkable names to the oracle, and apply the abstention policy.</p>
+        </div></li>
+        <li><span class="n">07</span><div>
+          <h4>Evaluate</h4>
+          <p>Run the golden set across configurations. Every run writes a row holding its full config and git SHA, so any number can be traced to what produced it.</p>
+        </div></li>
+      </ol>
+
+      <h3>Data model</h3>
+      <p>
+        Seven tables in Postgres 16 with pgvector. <code>documents</code> and
+        <code>chunks</code> hold the version-tagged corpus; <code>symbols</code> is the
+        oracle; <code>golden_queries</code>, <code>runs</code>, <code>answers</code> and
+        <code>claims</code> hold the evaluation. Cost and latency are recorded on every
+        answer from the first run rather than estimated later.
+      </p>
+    </section>
+
+    <!-- ============ CORPUS ============ -->
+    <section id="corpus">
+      <h2>The corpus finding</h2>
+      <p class="section-note">where vLLM's documentation actually lives</p>
+
+      <p>
+        Retrieval for "what does <code>max_num_seqs</code> do" returned the wrong
+        document, and the cause turned out to be the corpus rather than the ranking.
+        vLLM documents its engine arguments almost entirely as <strong>attribute
+        docstrings</strong> — a bare string after a field assignment:
+      </p>
+
+<pre><code>max_num_seqs: int = Field(default=DEFAULT_MAX_NUM_SEQS, ge=1)
+"""Maximum number of sequences to be processed in a single iteration."""</code></pre>
+
+      <p>
+        Python's <code>ast.get_docstring</code> cannot see these — they belong to no
+        function or class — so the obvious docstring walk drops every one. In
+        <code>vllm/config/</code> alone that is <strong>532 field descriptions</strong>.
+      </p>
+
+      <div class="callout finding">
+        <p class="label">Why this compounds</p>
+        <p>
+          The rendered engine-arguments page is generated from those same fields at docs
+          build time and is not committed. The source tree holds only a stub ending in an
+          mkdocs include directive, and <strong>29 doc pages</strong> share that shape. So
+          the authoritative description of every engine flag was missing from both the
+          docs sources <em>and</em> a naive docstring pass.
+        </p>
+      </div>
+
+      <p>
+        After capturing them, the top reranked span for that query went from a wrong
+        document to <code>SchedulerConfig.max_num_seqs</code> at 0.99. This is also the
+        clearest argument for the symbol oracle: for flags and config keys, ground truth
+        is in the source tree, not the prose.
+      </p>
+    </section>
+
+    <!-- ============ CHUNKING ============ -->
+    <section id="chunking">
+      <h2>Chunking</h2>
+      <p class="section-note">measured, not judged — 6,245 fenced code blocks</p>
+
+      <p>
+        For every fenced code block in the corpus, does some chunk contain its body
+        verbatim? A block split across two chunks fails, because neither half is a
+        command anyone can run.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <caption>Aggregate integrity understates the effect; the split by block length is where the real result is.</caption>
+          <thead>
+            <tr>
+              <th>Block size (tokens)</th>
+              <th class="num">Blocks</th>
+              <th class="num">fixed intact</th>
+              <th class="num">structure_aware</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="name">≤ 32</td><td class="num">3,161</td><td class="num">100%</td><td class="num">100%</td></tr>
+            <tr><td class="name">33–64</td><td class="num">1,744</td><td class="num">100%</td><td class="num">100%</td></tr>
+            <tr><td class="name">65–128</td><td class="num">966</td><td class="num">95%</td><td class="num">100%</td></tr>
+            <tr><td class="name">129–256</td><td class="num">316</td><td class="num">79%</td><td class="num">100%</td></tr>
+            <tr class="best"><td class="name">&gt; 256</td><td class="num">58</td><td class="num">31%</td><td class="num">100%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Reported flat, fixed-size chunking keeps 97.6% of blocks intact and the strategy
+        looks barely worth having. Split by length, it keeps only <strong>31% of blocks
+        over 256 tokens</strong> — the multi-line configs and full serve invocations a
+        user actually wants to copy whole.
+      </p>
+
+      <p>
+        The mechanism is arithmetic, not mystery. With a 512-token window and 64-token
+        overlap the stride is 448, so a block survives only if its length fits in what
+        remains of the window where it lands. Worst-case alignment leaves 65 tokens.
+      </p>
+
+      <div class="callout caveat">
+        <p class="label">Measured caveat</p>
+        <p>
+          11 of 6,245 blocks exceed the encoder's 512-token input limit, the largest at
+          913. Structure-aware chunking keeps those whole in storage, but bge-small still
+          truncates them at embed time — "intact" means retrievable as text, not fully
+          embedded.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ RETRIEVAL ============ -->
+    <section id="retrieval">
+      <h2>Retrieval</h2>
+      <p class="section-note">recall@k over 52 golden questions from real vLLM issues</p>
+
+      <div class="scroller">
+        <table>
+          <caption>
+            Recall is measured at the document level: of the top k retrieved chunks, did any come from a
+            document the golden entry names. The two strategies cut the same document into different numbers
+            of pieces, so a chunk-level score would reward whichever produces more chunks.
+          </caption>
+          <thead>
+            <tr>
+              <th>Chunking</th><th>Retrieval</th>
+              <th class="num">@1</th><th class="num">@3</th><th class="num">@5</th><th class="num">@10</th><th class="num">@20</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="name">fixed</td><td>dense</td><td class="num">0.21</td><td class="num">0.53</td><td class="num">0.67</td><td class="num">0.76</td><td class="num">0.82</td></tr>
+            <tr><td class="name">fixed</td><td>sparse</td><td class="num">0.17</td><td class="num">0.23</td><td class="num">0.23</td><td class="num">0.23</td><td class="num">0.25</td></tr>
+            <tr><td class="name">fixed</td><td>hybrid (RRF)</td><td class="num">0.32</td><td class="num">0.60</td><td class="num">0.74</td><td class="num">0.81</td><td class="num">0.85</td></tr>
+            <tr><td class="name">fixed</td><td>hybrid + rerank</td><td class="num">0.42</td><td class="num">0.68</td><td class="num">0.77</td><td class="num">0.84</td><td class="num">0.85</td></tr>
+            <tr><td class="name">structure_aware</td><td>dense</td><td class="num">0.48</td><td class="num">0.64</td><td class="num">0.71</td><td class="num">0.78</td><td class="num">0.92</td></tr>
+            <tr><td class="name">structure_aware</td><td>sparse</td><td class="num">0.19</td><td class="num">0.23</td><td class="num">0.23</td><td class="num">0.23</td><td class="num">0.25</td></tr>
+            <tr><td class="name">structure_aware</td><td>hybrid (RRF)</td><td class="num">0.54</td><td class="num">0.72</td><td class="num">0.76</td><td class="num">0.83</td><td class="num">0.96</td></tr>
+            <tr class="best"><td class="name">structure_aware</td><td>hybrid + rerank</td><td class="num">0.55</td><td class="num">0.90</td><td class="num">0.92</td><td class="num">0.95</td><td class="num">0.96</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Why the comparison is paired</h3>
+      <p>
+        Every cell runs the same questions, so a per-question record is available and is
+        far stronger than a difference of means at this sample size. A two-sided exact
+        sign test is the right check — it assumes only that a question separating the two
+        configurations is a coin flip under the null.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <caption>Structure-aware chunking never loses a question at k of 3 or more. Growing the set from 33 to 52 questions strengthened this rather than washing it out.</caption>
+          <thead>
+            <tr><th class="num">k</th><th class="num">structure_aware better</th><th class="num">fixed better</th><th class="num">same</th><th class="num">sign test</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="num">1</td><td class="num">13</td><td class="num">3</td><td class="num">36</td><td class="num">p = 0.0213</td></tr>
+            <tr class="best"><td class="num">3</td><td class="num">15</td><td class="num">0</td><td class="num">37</td><td class="num">p = 0.0001</td></tr>
+            <tr><td class="num">5</td><td class="num">11</td><td class="num">0</td><td class="num">41</td><td class="num">p = 0.0010</td></tr>
+            <tr><td class="num">10</td><td class="num">8</td><td class="num">0</td><td class="num">44</td><td class="num">p = 0.0078</td></tr>
+            <tr><td class="num">20</td><td class="num">8</td><td class="num">0</td><td class="num">44</td><td class="num">p = 0.0078</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Three things the table supports</h3>
+      <ul>
+        <li>
+          <strong>Sparse alone reaches only 0.25.</strong> Not a bug. These are
+          natural-language issue titles that share almost no vocabulary with the docs;
+          keyword search cannot match "concurrent sequences" to <code>max_num_seqs</code>.
+          It earns its place inside the hybrid, not on its own.
+        </li>
+        <li>
+          <strong>Reranking helps structure-aware far more than fixed</strong>, lifting
+          recall@3 from 0.72 to 0.90 against 0.60 to 0.68. A cross-encoder scores a query
+          against a passage, and a window starting mid-sentence is a worse passage to
+          score. Chunking and reranking are not independent choices.
+        </li>
+        <li>
+          <strong>Only two questions are never retrieved by any configuration</strong> —
+          the same two, after adding nineteen more. Both were flagged as expected failures
+          during curation, before the harness existed.
+        </li>
+      </ul>
+
+      <h3>The golden set</h3>
+      <p>
+        52 questions, every one filed by a real person on vLLM's issue tracker, harvested
+        from issues labelled <code>usage</code> and <code>documentation</code> and sorted
+        by reaction count. 563 candidates were harvested and curated against retrieval
+        evidence rather than titles.
+      </p>
+      <p>
+        Nothing is synthesised, and that is the point: a model-generated set is written in
+        the vocabulary of the documentation it came from, so it flatters retrieval and
+        measures the wrong thing. Two curation rules carry the set's integrity:
+        <strong>questions the system currently fails are kept</strong>, because a set built
+        only from what retrieval already finds is a transcript of current behaviour; and
+        <strong>questions no documentation can answer are dropped, not marked hard</strong>.
+      </p>
+      <p class="section-note">
+        By category — api 26 &middot; config 11 &middot; concept 9 &middot; troubleshooting 5 &middot; cli_flag 1.
+        By difficulty — easy 7 &middot; medium 31 &middot; hard 14.
+      </p>
+    </section>
+
+    <!-- ============ GENERATION ============ -->
+    <section id="generation">
+      <h2>Generation</h2>
+      <p class="section-note">52 answers, Claude Opus 5, metered per call</p>
+
+      <div class="scroller">
+        <table>
+          <caption>Cost per request is a question that gets asked directly, so it is measured rather than estimated. Abstained rows store NULL usage, never zeros, so an abstention cannot be averaged in as a free instant answer.</caption>
+          <thead><tr><th>Measure</th><th class="num">Value</th></tr></thead>
+          <tbody>
+            <tr><td>Answers generated</td><td class="num">52</td></tr>
+            <tr class="best"><td>Cost per answer</td><td class="num">$0.0304</td></tr>
+            <tr><td>Total for the run</td><td class="num">$1.5816</td></tr>
+            <tr><td>Mean latency</td><td class="num">9,031 ms</td></tr>
+            <tr><td>Spans supplied that were cited</td><td class="num">77%</td></tr>
+            <tr><td>Answers citing a span that did not exist</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        The model must cite a span number after every factual claim. That requirement is
+        load-bearing: it means the (claim, span) pairs the grounding layer needs are
+        already in the text, so claim extraction is deterministic and re-scoring an answer
+        under a different threshold costs nothing.
+      </p>
+
+      <div class="callout">
+        <p class="label">A retrieval signal hiding in the generation numbers</p>
+        <p>
+          23% of supplied spans are never cited. That is not a generation fault —
+          <code>rerank_top_n</code> is 5 and answers typically use fewer, so the surplus is
+          paid for in input tokens on every query. The triad later put 41% of spans as not
+          useful, judging independently and without seeing which were cited. Two unrelated
+          measurements agreeing is much stronger than either alone.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ ORACLE ============ -->
+    <section id="oracle">
+      <h2>The symbol oracle</h2>
+      <p class="section-note">13,369 symbols from 2,392 files, recovered by AST walk</p>
+
+      <p>
+        Symbols are recovered by walking the AST of the pinned checkout, never by
+        importing vLLM or running <code>--help</code>: both need the package installed
+        with CUDA, and the oracle has to run in CI.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <caption>Present is certain. Absent means "not found in the scanned tree at this commit" — strong evidence for a flag, since flags are declared as literals, but evidence rather than proof.</caption>
+          <thead><tr><th>Kind</th><th class="num">Symbols</th></tr></thead>
+          <tbody>
+            <tr><td class="name">cli_flag</td><td class="num">433</td></tr>
+            <tr><td class="name">config_key</td><td class="num">3,603</td></tr>
+            <tr><td class="name">class</td><td class="num">5,366</td></tr>
+            <tr><td class="name">function</td><td class="num">3,967</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Two ways it was wrong before it was right</h3>
+      <p>
+        <strong>vLLM declares its command line two ways.</strong> Most flags are string
+        literals in <code>add_argument</code>; the rest are generated in a loop from
+        dataclass fields with no literal anywhere. A literals-only oracle reported
+        <code>--tool-call-parser</code>, <code>--chat-template</code> and
+        <code>--enable-auto-tool-choice</code> as non-existent. All three are real, and
+        the oracle was calling correct answers hallucinations.
+      </p>
+
+      <p>
+        <strong>Jurisdiction was far too broad.</strong> The first version judged every
+        <code>--flag</code> and every backticked identifier. Across 33 real answers that
+        gave 106 checkable mentions at a <strong>42% "not found" rate</strong>, and almost
+        none were hallucinations:
+      </p>
+
+      <div class="scroller">
+        <table>
+          <caption>An oracle that reports these as contradictions is worse than no oracle, because its verdicts carry the authority of ground truth.</caption>
+          <thead><tr><th>What it actually was</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td>Another tool's flag, used correctly</td><td class="name">pip install --editable</td></tr>
+            <tr><td>Another tool's flag, used correctly</td><td class="name">numactl --cpunodebind</td></tr>
+            <tr><td>A config <em>value</em>, not a field name</td><td class="name">fp8_e5m2</td></tr>
+            <tr><td>A variable from the model's own example</td><td class="name">a_val, b_val</td></tr>
+            <tr><td>Another library's API parameter</td><td class="name">max_new_tokens</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        It now rules only on flags appearing inside an actual vLLM invocation, and does not
+        adjudicate config keys at all. After narrowing, the same answers give
+        <strong>7 adjudicable claims and 0 contradictions</strong>, and every flag the
+        answers attributed to vLLM is real. The cost is recall, and that is the right way
+        round: a hallucinated flag outside a command line falls through to the judge, which
+        the design already has as a fallback. A false contradiction has no safety net.
+      </p>
+
+      <p>
+        Verified in both directions — an invented <code>--enable-turbo-mode</code> inside a
+        serve command returns <span class="pill bad">contradicted</span>, not merely
+        unsupported, because the source says otherwise.
+      </p>
+    </section>
+
+    <!-- ============ TRADEOFF ============ -->
+    <section id="tradeoff">
+      <h2>The tradeoff curve</h2>
+      <p class="section-note">the headline deliverable — 52 questions, 496 claims</p>
+
+      <figure>
+        <div class="chart-wrap">
+          <svg viewBox="0 0 720 360" role="img" aria-label="As the abstention threshold rises from 0 to 1, the share of questions answered falls from 100 percent to 17 percent, while the share of delivered claims carrying no citation falls from 22 percent to zero.">
+            <!-- gridlines -->
+            <g stroke="var(--rule)" stroke-width="1">
+              <line x1="60" y1="30"    x2="690" y2="30"></line>
+              <line x1="60" y1="97.5"  x2="690" y2="97.5"></line>
+              <line x1="60" y1="165"   x2="690" y2="165"></line>
+              <line x1="60" y1="232.5" x2="690" y2="232.5"></line>
+            </g>
+            <line x1="60" y1="300" x2="690" y2="300" stroke="var(--rule-strong)" stroke-width="1"></line>
+            <line x1="60" y1="30" x2="60" y2="300" stroke="var(--rule-strong)" stroke-width="1"></line>
+
+            <!-- y labels -->
+            <g fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="end">
+              <text x="50" y="34">100%</text>
+              <text x="50" y="101.5">75%</text>
+              <text x="50" y="169">50%</text>
+              <text x="50" y="236.5">25%</text>
+              <text x="50" y="304">0%</text>
+            </g>
+
+            <!-- x labels -->
+            <g fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle">
+              <text x="60"  y="322">0.0</text>
+              <text x="186" y="322">0.2</text>
+              <text x="312" y="322">0.4</text>
+              <text x="438" y="322">0.6</text>
+              <text x="564" y="322">0.8</text>
+              <text x="690" y="322">1.0</text>
+            </g>
+            <text x="375" y="346" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="12" text-anchor="middle">Abstention threshold — share of an answer's claims that must be supported</text>
+
+            <!-- knee marker -->
+            <rect x="438" y="30" width="63" height="270" fill="var(--accent-soft)" opacity="0.55"></rect>
+            <text x="469" y="24" fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="10.5" text-anchor="middle">knee</text>
+
+            <!-- answered -->
+            <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"
+              points="60,30 123,35.4 186,35.4 249,40.8 312,46.2 375,46.2 438,75.9 501,119.1 564,205.5 627,248.7 690,254.1"></polyline>
+            <g fill="var(--accent)">
+              <circle cx="60" cy="30" r="3.5"></circle>
+              <circle cx="438" cy="75.9" r="3.5"></circle>
+              <circle cx="501" cy="119.1" r="3.5"></circle>
+              <circle cx="690" cy="254.1" r="3.5"></circle>
+            </g>
+            <text x="72" y="22" fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11">100%</text>
+            <text x="678" y="272" fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="end">17%</text>
+
+            <!-- uncited -->
+            <polyline fill="none" stroke="var(--warn)" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="6 3"
+              points="60,240.6 123,240.6 186,240.6 249,243.3 312,243.3 375,243.3 438,251.4 501,259.5 564,281.1 627,297.3 690,300"></polyline>
+            <g fill="var(--warn)">
+              <circle cx="60" cy="240.6" r="3.5"></circle>
+              <circle cx="690" cy="300" r="3.5"></circle>
+            </g>
+            <text x="72" y="234" fill="var(--warn)" font-family="IBM Plex Mono, monospace" font-size="11">22%</text>
+
+            <!-- unsupported (flat at ~0) -->
+            <polyline fill="none" stroke="var(--bad)" stroke-width="2.5" stroke-linejoin="round"
+              points="60,299.4 375,299.4 438,300 690,300"></polyline>
+            <text x="150" y="292" fill="var(--bad)" font-family="IBM Plex Mono, monospace" font-size="11">1 claim in 496</text>
+          </svg>
+        </div>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--accent)"></i> Questions answered</span>
+          <span><i class="swatch" style="background:var(--warn)"></i> Delivered claims with no citation</span>
+          <span><i class="swatch" style="background:var(--bad)"></i> Delivered claims cited but unsupported</span>
+        </div>
+        <figcaption>
+          The sweep calls no model: claims are scored once and re-thresholded, so the whole
+          curve costs one pass over answers already paid for.
+        </figcaption>
+      </figure>
+
+      <div class="scroller">
+        <table>
+          <caption>Run 9 &middot; 52 questions &middot; 496 claims. Reproduce with <code>uv run anchor ground</code>.</caption>
+          <thead>
+            <tr><th class="num">Threshold</th><th class="num">Answered</th><th class="num">Abstained</th><th class="num">Answer rate</th><th class="num">Delivered claims</th><th class="num">Cited, unsupported</th><th class="num">Uncited</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="num">0.00</td><td class="num">52</td><td class="num">0</td><td class="num">100%</td><td class="num">496</td><td class="num">1</td><td class="num">107 (22%)</td></tr>
+            <tr><td class="num">0.30</td><td class="num">50</td><td class="num">2</td><td class="num">96%</td><td class="num">481</td><td class="num">1</td><td class="num">100 (21%)</td></tr>
+            <tr><td class="num">0.50</td><td class="num">49</td><td class="num">3</td><td class="num">94%</td><td class="num">476</td><td class="num">1</td><td class="num">98 (21%)</td></tr>
+            <tr class="best"><td class="num">0.60</td><td class="num">43</td><td class="num">9</td><td class="num">83%</td><td class="num">416</td><td class="num">0</td><td class="num">74 (18%)</td></tr>
+            <tr class="best"><td class="num">0.70</td><td class="num">35</td><td class="num">17</td><td class="num">67%</td><td class="num">323</td><td class="num">0</td><td class="num">48 (15%)</td></tr>
+            <tr><td class="num">0.80</td><td class="num">18</td><td class="num">34</td><td class="num">35%</td><td class="num">148</td><td class="num">0</td><td class="num">11 (7%)</td></tr>
+            <tr><td class="num">0.90</td><td class="num">10</td><td class="num">42</td><td class="num">19%</td><td class="num">77</td><td class="num">0</td><td class="num">1 (1%)</td></tr>
+            <tr><td class="num">1.00</td><td class="num">9</td><td class="num">43</td><td class="num">17%</td><td class="num">63</td><td class="num">0</td><td class="num">0 (0%)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout finding">
+        <p class="label">The finding that nearly became a false headline</p>
+        <p>
+          The two failure columns are separate on purpose. A claim citing a span that does
+          not support it asserted something its own evidence contradicts; a claim citing
+          nothing is merely unattributable. The first version of this table folded both
+          into one "unsupported" figure and reported <strong>37%</strong>. Split apart, the
+          strict failure rate is <strong>1 claim in 496</strong> — the 37% was almost
+          entirely uncited claims, and publishing it as a hallucination rate would have
+          been wrong.
+        </p>
+      </div>
+
+      <p>
+        A second correction in the same area: honest hedging was being scored as
+        hallucination. Sentences like "the provided spans don't cover S3 credential
+        configuration" assert nothing about vLLM — they are the model correctly declining,
+        which is precisely what the abstention policy exists to encourage. Counting them as
+        unsupported would push the system toward confident guessing. They are now excluded
+        from the faithfulness denominator.
+      </p>
+    </section>
+
+    <!-- ============ VERIFIERS ============ -->
+    <section id="verifiers">
+      <h2>Verifier agreement</h2>
+      <p class="section-note">306 claims scored by both the free check and the paid judge</p>
+
+      <div class="scroller">
+        <table>
+          <caption>Measured on the 33-question run. The judge has not been re-run at 52 questions; an agreement rate over 306 claims is not fragile.</caption>
+          <thead><tr><th>Verifier</th><th class="num">Claims</th><th class="num">Cost</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Symbol oracle</td><td class="num">3 answers</td><td class="num">free</td><td><span class="pill ok">0 contradictions</span></td></tr>
+            <tr><td>Span attribution</td><td class="num">306</td><td class="num">free</td><td>193 supported</td></tr>
+            <tr><td>LLM judge</td><td class="num">306</td><td class="num">$1.30</td><td>194 supported · 31 unsupported · 81 unverifiable</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        <strong>The two agree on 301 of 306 claims (98%)</strong> on the binary question of
+        support. The judge was stricter on 2, similarity on 3. That number is the phase 2
+        argument in miniature: a free check already reproduces a paid one almost
+        everywhere, and the question worth asking is whether the remaining 2% matters.
+      </p>
+
+      <p>
+        <strong>No claim cited a span that failed to support it.</strong> Both verifiers
+        agree, and every one of the judge's 31 <span class="pill warn">unsupported</span>
+        verdicts is on a claim carrying no citation at all. What the judge adds is a
+        distinction similarity cannot make: it splits the uncited claims into genuine
+        assertions that should have been cited and sentences that are not factual
+        assertions about vLLM at all.
+      </p>
+
+      <div class="callout">
+        <p class="label">Verified on a constructed case, because the real answers contain none</p>
+        <p>
+          Given a span reading "Default 128" and the claim "max_num_seqs defaults to 512",
+          the judge returns <span class="pill bad">contradicted</span> with the reason
+          "The span states the default is 128, not 512". Those strings differ by one token,
+          so cosine similarity is high. This is the failure similarity cannot see.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ TRIAD ============ -->
+    <section id="triad">
+      <h2>Triad and the ragas cross-check</h2>
+      <p class="section-note">two implementations of the same three metrics, and why they disagree</p>
+
+      <div class="scroller">
+        <table>
+          <caption>The ragas column is partial: it exhausted the API budget after roughly 17 of 52 samples. The disagreement it did surface is the useful part.</caption>
+          <thead><tr><th>Metric</th><th class="num">This repo</th><th class="num">ragas</th><th>Same thing?</th></tr></thead>
+          <tbody>
+            <tr><td>Faithfulness</td><td class="num">1 in 496</td><td class="num">0.94</td><td><span class="pill ok">roughly agrees</span></td></tr>
+            <tr class="best"><td>Answer relevance</td><td class="num">0.98</td><td class="num">0.57</td><td><span class="pill bad">no</span></td></tr>
+            <tr><td>Context</td><td class="num">0.59 relevance</td><td class="num">0.88 precision</td><td><span class="pill bad">different metric</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        The answer-relevance gap is definitional, not noise. This project's rubric states
+        explicitly that an honest "the documentation does not cover this" is relevant — it
+        answered the question, and penalising it rewards guessing. Ragas's
+        <code>AnswerRelevancy</code> generates questions from the answer and measures their
+        similarity to the original, so a non-answer scores near zero. Both metrics are
+        internally consistent. <strong>They measure different things and share a name.</strong>
+      </p>
+
+      <p>
+        That is the argument for running both rather than trusting either: quoting a
+        framework's number without its definition is how a results table ends up meaning
+        nothing. Ragas also costs roughly <strong>5&times; more per sample</strong> — about
+        $0.13 against $0.026 — because <code>AnswerRelevancy</code> alone makes several
+        generation calls per sample where the triad scores relevance and every span in one.
+        That figure is inferred from budget consumed rather than metered per call.
+      </p>
+    </section>
+
+    <!-- ============ BUGS ============ -->
+    <section id="bugs">
+      <h2>Bugs worth knowing</h2>
+      <p class="section-note">every one found by running the thing, not by reasoning about it</p>
+
+      <p>
+        Four of these were bugs in the <em>measurement</em>, which is the dangerous kind:
+        each would have produced a plausible number that was wrong, and three of them would
+        have accused the model of something it did not do.
+      </p>
+
+      <div class="scroller">
+        <table>
+          <caption>Ordered by how badly the un-fixed version would have misled a reader.</caption>
+          <thead><tr><th>Bug</th><th>What it would have published</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Citation parser read bracketed integers in code as citations</td>
+              <td>"4 of 33 answers cite a span that does not exist" — actually <code>output.outputs[0]</code> and <code>sizes=[1,2,4,8,16]</code>. True count: zero.</td>
+            </tr>
+            <tr>
+              <td>Merged two different failure modes into one column</td>
+              <td>A 37% hallucination rate. The strict rate is 1 in 496.</td>
+            </tr>
+            <tr>
+              <td>Oracle missed vLLM's second flag-declaration mechanism</td>
+              <td>Real flags reported as invented, including <code>--tool-call-parser</code>.</td>
+            </tr>
+            <tr>
+              <td>Oracle jurisdiction too broad</td>
+              <td>A 42% "not found" rate, nearly all of it pip and numactl flags used correctly.</td>
+            </tr>
+            <tr>
+              <td>Chunk step re-resolved vLLM's branch tip</td>
+              <td>All 1,729 document lookups missed; main had moved mid-session.</td>
+            </tr>
+            <tr>
+              <td>Schema init registered pgvector before the extension existed</td>
+              <td>Passed locally, failed in CI on the first push. Caught by CI.</td>
+            </tr>
+            <tr>
+              <td><code>SET LOCAL hnsw.ef_search = %s</code></td>
+              <td>Syntax error: <code>SET</code> is parsed before bind parameters are substituted.</td>
+            </tr>
+            <tr>
+              <td>A test asserting something arithmetically impossible</td>
+              <td>Claimed one first place could outrank two second places; 2/(k+2) &gt; 1/(k+1) reduces to k &gt; 0.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Two smaller ones worth remembering because they are environment-specific: rich
+        parsed square brackets in retrieved documentation as markup tags, and a rocket
+        emoji in vLLM's docs crashed console output on the Windows codepage.
+      </p>
+    </section>
+
+    <!-- ============ DECISIONS ============ -->
+    <section id="decisions">
+      <h2>Decisions that diverge from the spec</h2>
+      <p class="section-note">recorded in CLAUDE.md so a later session does not silently undo them</p>
+
+      <ul>
+        <li>
+          <strong>Claim extraction is deterministic, not model-driven.</strong> The
+          generator already cites a span per claim, so the pairs are in the text. This
+          keeps runs reproducible, makes re-thresholding free, and avoids letting one
+          model both invent the claims and rule on them — which would let its segmentation
+          choices set the denominator of the faithfulness metric.
+        </li>
+        <li>
+          <strong>The triad is implemented, and ragas runs beside it.</strong> Ragas
+          requires LangChain, which the spec forbade while also naming ragas. Those cannot
+          both hold. The triad was written directly; once LangChain was permitted, ragas
+          was added as a cross-check rather than a replacement.
+        </li>
+        <li>
+          <strong>The oracle rules only on CLI flags inside a vLLM invocation</strong> and
+          does not adjudicate config keys, for the precision reasons above.
+        </li>
+        <li>
+          <strong>CI evals run over a fixture corpus.</strong> Building the real one takes
+          about fifteen minutes per push.
+        </li>
+      </ul>
+
+      <h3>Two maintenance costs of the ragas dependency</h3>
+      <p>
+        Recorded because they will bite whoever touches it next. Ragas 0.4.3 still imports
+        <code>langchain_community.chat_models.vertexai</code>, removed in
+        langchain-community 0.4, so that is pinned below 0.4. And Opus 5 rejects
+        <code>temperature</code> outright while LangChain sends one by default and ragas
+        overwrites it per call, so both are suppressed via <code>temperature=None</code>
+        and <code>bypass_temperature</code>.
+      </p>
+    </section>
+
+    <!-- ============ NOT DONE ============ -->
+    <section id="notdone">
+      <h2>What is not done</h2>
+      <p class="section-note">stated plainly rather than left for a reader to discover</p>
+
+      <div class="scroller">
+        <table>
+          <caption>Nothing here invalidates a published number; each is a refinement or a step that requires a human account.</caption>
+          <thead><tr><th>Item</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Golden set at 52 of a 60–80 target</td><td><span class="pill warn">partial</span> results are directional at the margins</td></tr>
+            <tr><td>CI evals run on a fixture corpus</td><td><span class="pill warn">partial</span> proves the pipeline, not real-corpus recall</td></tr>
+            <tr><td>LLM judge measured at 33 questions</td><td><span class="pill warn">partial</span> not re-run at 52</td></tr>
+            <tr><td>ragas cross-check</td><td><span class="pill warn">partial</span> ~17 of 52 samples</td></tr>
+            <tr><td>Hugging Face Spaces deployment</td><td><span class="pill bad">needs you</span> publishes under your account</td></tr>
+            <tr><td>vLLM documentation pull request</td><td><span class="pill bad">needs you</span> drafted, not filed</td></tr>
+            <tr><td>Phase 2 — LoRA judge distillation</td><td><span class="pill bad">not started</span> by design</td></tr>
+            <tr><td>Phase 3 — k3s serving</td><td><span class="pill bad">not started</span> by design</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ GUIDE ============ -->
+    <section id="guide">
+      <h2>Guide: what remains</h2>
+      <p class="section-note">in the order I would do them</p>
+
+      <div class="step">
+        <div class="step-head"><h3>Deploy the demo to Hugging Face Spaces</h3><span class="tag you">you</span><span class="tag">~30 min</span></div>
+        <p>
+          Everything is built: <code>app.py</code> at the repo root is the Spaces
+          entrypoint, and <code>src/anchor/demo/app.py</code> holds the Gradio interface.
+          A Space has no Postgres, so the corpus must be reachable over the network.
+        </p>
+        <ol class="body-list">
+          <li>Host the corpus somewhere reachable — Neon, Supabase or Railway all offer a free Postgres with the <code>pgvector</code> extension.</li>
+          <li>Load the corpus into it: point <code>ANCHOR_PG_DSN</code> at the hosted database and run <code>anchor db init</code>, <code>ingest</code>, <code>chunk</code>, <code>index</code>, <code>oracle-build</code>.</li>
+          <li>Create a Space (Gradio SDK), push the repository to it, and set two secrets: <code>ANCHOR_PG_DSN</code> and <code>ANTHROPIC_API_KEY</code>.</li>
+          <li>Add a <code>requirements.txt</code> for the Space — it does not read <code>pyproject.toml</code>.</li>
+        </ol>
+        <div class="callout caveat">
+          <p class="label">Before you make it public</p>
+          <p>
+            The demo calls the generation API on every question with no rate limit. A
+            public Space with your key attached will spend real money at whatever rate
+            visitors ask questions. Add a per-session cap, or keep the Space private and
+            share it selectively.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><h3>File the vLLM documentation pull request</h3><span class="tag you">you</span><span class="tag">~1 hour</span></div>
+        <p>
+          Drafted in <code>contrib/vllm-docs-pr/</code>. The gap is real and the harness
+          found it rather than a hunch: vLLM has five logging environment variables and no
+          logging documentation page, which is why "How to disable logging" is one of two
+          golden questions no configuration can answer.
+        </p>
+        <p>The draft carries a pre-filing checklist. Work through it in order:</p>
+        <ol class="body-list">
+          <li>Re-read <code>vllm/envs.py</code> and <code>vllm/logger.py</code> at current <code>main</code> — the draft was verified at <code>65f3fca5</code> and vLLM moves daily.</li>
+          <li>Render the page in a local <code>mkdocs serve</code>.</li>
+          <li>Confirm issue #6660 is still the best one to reference.</li>
+          <li>Read vLLM's CONTRIBUTING.md for the current DCO and title conventions.</li>
+        </ol>
+        <p>
+          This one is worth doing properly: a merged documentation PR to a project with
+          this much traffic is a stronger artifact than any table in this report.
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><h3>Finish the golden set to 60–80</h3><span class="tag">free</span><span class="tag">~2 hours</span></div>
+        <p>
+          Curation and the recall harness never call the generation API, so extending the
+          set and re-running recall costs nothing. 168 unused question-shaped candidates
+          are already harvested in <code>data/golden/candidates.jsonl</code>.
+        </p>
+<pre><code>uv run anchor golden propose --limit 80 --out evidence.txt
+<span class="c"># read evidence.txt, add entries to data/golden/golden.yaml</span>
+uv run anchor golden validate
+uv run anchor eval-retrieval</code></pre>
+        <p>
+          Curate against the evidence, never the title. Two rules keep the set honest:
+          keep questions the system fails, and drop questions no documentation can answer
+          rather than marking them hard. Regenerating answers and grounding on the larger
+          set does cost money — roughly $0.03 per question for answers plus about $0.026
+          each for the triad.
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><h3>Complete the ragas comparison</h3><span class="tag">~$3</span><span class="tag">optional</span></div>
+        <p>
+          The finding is already established and more samples cannot overturn it, so this
+          is a decimal-tightening exercise. Run <code>uv run anchor ragas</code> with
+          enough credit to finish all 52 samples. Budget roughly $0.13 per sample.
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><h3>Phase 2 — LoRA judge distillation</h3><span class="tag">October</span></div>
+        <p>
+          The case for it is already measured, which is the unusual part: span attribution
+          reproduces the judge on 98% of claims, and the <code>claims</code> table holds
+          802 labelled rows accumulated as a byproduct of work already done.
+        </p>
+        <ol class="body-list">
+          <li>Harvest <code>(claim_text, supporting span, verdict)</code> from <code>claims</code> where <code>verifier = 'llm_judge'</code>.</li>
+          <li>LoRA-tune <code>Qwen2.5-1.5B-Instruct</code> with PEFT. Use QLoRA at 4-bit — the GPU is a 12 GB laptop part.</li>
+          <li>Report Cohen's κ against the Claude judge, not raw accuracy: the classes are heavily imbalanced at roughly 194 supported to 31 unsupported.</li>
+          <li>Plot agreement against cost per judgment. That is the second chart.</li>
+        </ol>
+        <div class="callout caveat">
+          <p class="label">Be ready to defend the sample size</p>
+          <p>
+            802 claims is thin for fine-tuning, and most carry the same verdict. Generating
+            more judged claims first — by running the judge over a larger golden set — is
+            probably the right first step, and it is cheap relative to the training run.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><h3>Phase 3 — k3s serving</h3><span class="tag">November</span></div>
+        <ol class="body-list">
+          <li>k3s on the RTX 5070 Ti with the NVIDIA device plugin for GPU scheduling.</li>
+          <li>Serve the generator via vLLM as a Deployment; the anchor API as a second one. The <code>VLLMBackend</code> already exists and speaks the OpenAI-compatible API.</li>
+          <li>Quantize with AWQ or GPTQ and record the memory and throughput delta.</li>
+          <li>HPA driven by queue depth rather than CPU — and be able to say why.</li>
+          <li>Load-test with k6 and record sustained RPM and P99 latency, before and after quantization.</li>
+        </ol>
+        <div class="callout caveat">
+          <p class="label">Hardware constraint, measured</p>
+          <p>
+            The GPU is a 12 GB RTX 5070 Ti <em>Laptop</em>, not the 16 GB desktop part.
+            Qwen2.5-7B will not serve unquantized. Quantization is therefore a requirement
+            rather than an experiment — which happens to align with the deliverable.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ REFERENCE ============ -->
+    <section id="reference">
+      <h2>Command reference</h2>
+      <p class="section-note">the whole pipeline, in order</p>
+
+<pre><code><span class="c"># setup</span>
+cp .env.example .env          <span class="c"># then fill in ANTHROPIC_API_KEY</span>
+uv sync --all-extras
+docker compose up -d db       <span class="c"># Postgres 16 + pgvector on host port 5433</span>
+uv run anchor db init
+
+<span class="c"># build the corpus  (free, ~15 min, mostly embedding on CPU)</span>
+uv run anchor ingest          <span class="c"># stays on the pinned commit; --latest to advance</span>
+uv run anchor chunk           <span class="c"># builds both strategies</span>
+uv run anchor index           <span class="c"># resumable; re-run after an interruption</span>
+uv run anchor oracle-build    <span class="c"># 13,369 symbols</span>
+
+<span class="c"># evaluate retrieval  (free)</span>
+uv run anchor golden sync
+uv run anchor golden validate
+uv run anchor eval-retrieval  <span class="c"># --min-recall 0.9 turns it into a gate</span>
+uv run anchor integrity       <span class="c"># code-block integrity table</span>
+
+<span class="c"># generate and ground  (costs money)</span>
+uv run anchor answer-golden --yes   <span class="c"># ~$0.03 per question</span>
+uv run anchor ground                <span class="c"># --no-judge for the free version</span>
+uv run anchor triad                 <span class="c"># ~$0.026 per question</span>
+uv run anchor ragas                 <span class="c"># ~$0.13 per question</span>
+
+<span class="c"># serve</span>
+docker compose --profile app up     <span class="c"># API on :8080, demo on :7860</span>
+
+<span class="c"># checks, exactly as CI runs them</span>
+uv run ruff check . &amp;&amp; uv run ruff format --check .
+uv run mypy src tests
+uv run pytest</code></pre>
+
+      <h3>Where things live</h3>
+      <div class="scroller">
+        <table>
+          <caption>6,632 lines of source across nine modules, with 3,106 lines of tests.</caption>
+          <thead><tr><th>Path</th><th class="num">Lines</th><th>Holds</th></tr></thead>
+          <tbody>
+            <tr><td class="name">src/anchor/config.py</td><td class="num">—</td><td>Every tunable value; nothing downstream inlines a magic number</td></tr>
+            <tr><td class="name">src/anchor/schema.sql</td><td class="num">—</td><td>The data model, applied by compose and by the CLI</td></tr>
+            <tr><td class="name">ground/</td><td class="num">1,590</td><td>Oracle, claims, attribution, judge, tradeoff, abstention</td></tr>
+            <tr><td class="name">evaluate/</td><td class="num">1,576</td><td>Golden set, harvest, recall harness, triad, ragas</td></tr>
+            <tr><td class="name">ingest/</td><td class="num">565</td><td>Clone, parse, version-tag</td></tr>
+            <tr><td class="name">chunk/</td><td class="num">530</td><td>Both strategies and the block parser</td></tr>
+            <tr><td class="name">generate/</td><td class="num">474</td><td>Prompt assembly, backends, persistence</td></tr>
+            <tr><td class="name">retrieve/</td><td class="num">307</td><td>Dense, sparse, RRF, rerank</td></tr>
+            <tr><td class="name">index/</td><td class="num">222</td><td>Embedding and pgvector writes</td></tr>
+            <tr><td class="name">api/ · demo/</td><td class="num">299</td><td>FastAPI and Gradio</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>What it cost to produce these numbers</h3>
+      <p>
+        Roughly <strong>$8.20</strong> of API spend across the whole project. Metered:
+        $2.51 for 85 answers across two runs, $1.30 for the judge, $2.18 for two triad
+        runs. Inferred: about $2.20 for the partial ragas runs. Everything else —
+        ingestion, chunking, indexing, retrieval, recall, the oracle and the integrity
+        metric — is free and runs on CPU.
+      </p>
+    </section>
+
+  </main>
+
+  <footer>
+    anchor · phase 1 · 23 commits · 294 tests · github.com/yashraz23/anchor
+  </footer>
+</div>
