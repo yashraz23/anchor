@@ -43,6 +43,20 @@ def init_schema(settings: Settings) -> None:
         conn.commit()
 
 
+def latest_ingested_commit(conn: psycopg.Connection[DictRow]) -> str | None:
+    """The commit the corpus was most recently ingested at, or None.
+
+    Every stage after ingest pins to this rather than re-resolving the tip of
+    the branch. vLLM's main moves several times a day, so re-resolving would
+    check out a tree that no longer matches the `documents` rows and every path
+    lookup would miss.
+    """
+    row = conn.execute(
+        "SELECT commit_sha FROM documents ORDER BY fetched_at DESC, id DESC LIMIT 1"
+    ).fetchone()
+    return str(row["commit_sha"]) if row else None
+
+
 def set_ef_search(conn: psycopg.Connection[DictRow], ef_search: int) -> None:
     """Set the HNSW search-time breadth for this session.
 

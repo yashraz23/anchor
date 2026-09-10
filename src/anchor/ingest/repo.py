@@ -101,12 +101,17 @@ def resolve_version(root: Path) -> str:
     return tag or read_version(root)
 
 
-def prepare_checkout(settings: IngestSettings) -> RepoSnapshot:
+def prepare_checkout(settings: IngestSettings, commit: str | None = None) -> RepoSnapshot:
     """Clone or update the vLLM checkout and pin it to a commit.
 
-    With `vllm_commit` empty the tip of `vllm_branch` is resolved and pinned to
-    whatever it is right now, and the resolved SHA is returned so the caller can
-    write it into config and reproduce the run later.
+    With no commit from either `commit` or `vllm_commit`, the tip of
+    `vllm_branch` is resolved and pinned to whatever it is right now, and the
+    resolved SHA is returned so the caller can reproduce the run later.
+
+    Every stage after ingest must pass `commit` explicitly, with the value the
+    corpus was ingested at. vLLM's main branch moves several times a day, so a
+    later stage that re-resolves the tip silently checks out a different tree
+    than the one `documents` describes, and every path lookup then misses.
     """
     root = settings.checkout_dir
     root.parent.mkdir(parents=True, exist_ok=True)
@@ -120,8 +125,9 @@ def prepare_checkout(settings: IngestSettings) -> RepoSnapshot:
             str(root),
         )
 
-    if settings.vllm_commit:
-        target = settings.vllm_commit
+    pinned = commit or settings.vllm_commit
+    if pinned:
+        target = pinned
         # An explicitly pinned commit may predate the local clone's last fetch.
         _git("fetch", "--filter=blob:none", "origin", target, cwd=root)
     else:

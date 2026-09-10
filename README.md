@@ -16,12 +16,54 @@ unusual for a RAG evaluation project. A second property falls out of the same
 choice: vLLM releases fast and its docs go stale, so chunks are version-tagged
 and the system can flag retrieved guidance that describes outdated behaviour.
 
-> **Status: week 1, in progress.** Every results table below is empty on
+> **Status: week 1, in progress.** Tables still marked TODO are empty on
 > purpose. Numbers appear here only once the harness has produced them.
 
 ---
 
 ## Results
+
+### Chunking: code-block integrity
+
+Measured, not judged. For every fenced code block in the corpus, does some chunk
+under this strategy contain that block's body verbatim? A block split across two
+chunks fails, because neither half is a command anyone can run.
+
+Corpus: vLLM v0.28.1rc0 at commit `65f3fca5`, 1722 documents, 6245 code blocks.
+
+| Chunking | Code blocks intact | Rate |
+|---|---|---|
+| `fixed` (512 tokens, 64 overlap) | 6095 / 6245 | 97.6% |
+| `structure_aware` | 6245 / 6245 | 100% |
+
+The aggregate rate is the least interesting cut of this, and on its own it is
+misleading. A 512-token window only breaks a block long enough to straddle a
+window boundary, and most blocks in these docs are one-line invocations. Split
+by block length, the effect is stark:
+
+| Block size (tokens) | Blocks | `fixed` intact | `structure_aware` intact |
+|---|---|---|---|
+| ≤ 32 | 3161 | 100% | 100% |
+| 33 to 64 | 1744 | 100% | 100% |
+| 65 to 128 | 966 | 95% | 100% |
+| 129 to 256 | 316 | 79% | 100% |
+| > 256 | 58 | **31%** | 100% |
+
+So the honest finding is narrower and more useful than "fixed-size chunking
+mangles code blocks". It mangles the *long* ones: the multi-line configs and
+full serve invocations, which are exactly the blocks a user wants to copy whole
+and the ones a short snippet cannot substitute for. Short blocks are unaffected,
+and any evaluation reporting only the aggregate would have missed this.
+
+Why the boundary behaves that way: with a 512-token window and 64-token overlap
+the stride is 448, so a block starting at offset `a` survives only if its length
+fits in `512 - (a mod 448)`. Worst-case alignment leaves 65 tokens. Every block
+above that is at the mercy of where it happens to land.
+
+**Caveat, measured:** 11 of 6245 blocks (0.18%) exceed the encoder's 512-token
+input limit, the largest at 913 tokens. Structure-aware chunking keeps those
+whole in storage, but bge-small still truncates them at embed time, so "intact"
+means retrievable as text, not fully embedded.
 
 ### Retrieval: recall@k by chunking strategy and retrieval mode
 
@@ -108,7 +150,16 @@ docker compose up -d db   # Postgres 16 + pgvector on host port 5433
 uv run anchor db init     # idempotent
 uv run anchor db check    # row counts per table
 uv run anchor config      # the exact JSON written to runs.config_json
+
+uv run anchor ingest      # clone vLLM at a pinned commit, parse, version-tag
+uv run anchor chunk       # build both chunking strategies over the corpus
+uv run anchor integrity   # the code-block integrity table above
 ```
+
+Every stage after `ingest` pins itself to the commit the corpus was ingested at,
+read back from the database. vLLM's main branch moves several times a day, so a
+stage that re-resolved the branch tip would check out a tree that no longer
+matches the `documents` rows.
 
 Run the checks the way CI does:
 
