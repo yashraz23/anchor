@@ -33,7 +33,7 @@
 # expected_chunk_ids is intentionally absent: chunk ids are stable only within
 # one (strategy, commit) pair, so they are resolved from the paths at eval time.
 #
-# STATUS: 33 of a target 60-80. Curation continues; the remaining candidates
+# STATUS: 52 of a target 60-80. Curation continues; the remaining candidates
 # are in candidates.jsonl awaiting review.
 
 queries:
@@ -343,3 +343,165 @@ queries:
     difficulty: hard
     expected_source_paths:
       - vllm/v1/metrics/loggers.py
+
+  # ---- batch 3 -----------------------------------------------------------
+  # Curated from a second evidence pass over the unused candidates. Every
+  # expected document was checked for the answer, not just for existence:
+  # two candidates were dropped here because their best-scoring page turned
+  # out never to mention the thing asked about.
+
+  - id: vllm-9784-return-logits
+    question: how to return logits
+    source_url: https://github.com/vllm-project/vllm/issues/9784
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/custom_logitsprocs.md
+
+  - id: vllm-7677-guided-decoding-backend
+    question: how to use guided_decoding_backend?
+    source_url: https://github.com/vllm-project/vllm/issues/7677
+    category: config
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/structured_outputs.md
+
+  - id: vllm-8813-bitsandbytes-serve
+    question: How to use BitsAndBytesConfig with vllm serve
+    source_url: https://github.com/vllm-project/vllm/issues/8813
+    category: config
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/quantization/bnb.md
+
+  - id: vllm-8401-gguf-openai-api
+    question: how to use openai compatible api to run GGUF model?
+    source_url: https://github.com/vllm-project/vllm/issues/8401
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/quantization/gguf.md
+      - docs/serving/online_serving/openai_compatible_server.md
+
+  - id: vllm-14089-spec-decode-pipeline-parallel
+    question: Why Speculative decoding is not compatiable with Pipeline Parallel?
+    source_url: https://github.com/vllm-project/vllm/issues/14089
+    category: concept
+    difficulty: hard
+    expected_source_paths:
+      - docs/features/speculative_decoding/README.md
+
+  - id: vllm-18451-disagg-prefill-spec-decode
+    question: Is the Prefill Decode Disaggregation compatible with Speculative Decoding?
+    source_url: https://github.com/vllm-project/vllm/issues/18451
+    category: concept
+    difficulty: hard
+    expected_source_paths:
+      - docs/features/disagg_prefill.md
+      - docs/features/speculative_decoding/README.md
+
+  - id: vllm-24039-disable-thinking
+    question: how to disable thinking for different model
+    source_url: https://github.com/vllm-project/vllm/issues/24039
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/reasoning_outputs.md
+
+  - id: vllm-15618-reasoning-with-structured-output
+    question: How to make the Reasoning of deepseek output normally with structured output
+    source_url: https://github.com/vllm-project/vllm/issues/15618
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/features/reasoning_outputs.md
+      - docs/features/structured_outputs.md
+
+  - id: vllm-14651-cache-lora-adapter
+    question: how to cache the lora adapter in memory
+    source_url: https://github.com/vllm-project/vllm/issues/14651
+    category: config
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/lora.md
+
+  - id: vllm-10784-dynamic-lora-models-endpoint
+    question: Dynamically loaded LoRAs do not appear on the /models endpoint
+    source_url: https://github.com/vllm-project/vllm/issues/10784
+    category: troubleshooting
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/lora.md
+
+  - id: vllm-8215-multi-image-inference
+    question: how can i perfrome multiimage inference?
+    source_url: https://github.com/vllm-project/vllm/issues/8215
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/multimodal_inputs.md
+
+  - id: vllm-8151-video-inference
+    question: How to use vllm infer video with a multimodal model
+    source_url: https://github.com/vllm-project/vllm/issues/8151
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/multimodal_inputs.md
+
+  - id: vllm-19277-request-output-metrics
+    question: How to make the metrics in RequestOutput not empty
+    source_url: https://github.com/vllm-project/vllm/issues/19277
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/per_request_metrics.md
+
+  - id: vllm-13553-logits-processors-batching
+    question: How to use logits processors with max_num_seqs > 1?
+    source_url: https://github.com/vllm-project/vllm/issues/13553
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/design/logits_processors.md
+
+  - id: vllm-16399-logit-processor-api-server
+    question: How to use logit-processor in api server?
+    source_url: https://github.com/vllm-project/vllm/issues/16399
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/design/logits_processors.md
+      - docs/features/custom_logitsprocs.md
+
+  - id: vllm-6085-multiple-models-one-server
+    question: How to deploy multiple models in one openai api server
+    source_url: https://github.com/vllm-project/vllm/issues/6085
+    category: concept
+    difficulty: medium
+    expected_source_paths:
+      - docs/usage/faq.md
+
+  - id: vllm-11379-offline-batch-inference
+    question: How do I run offline batch inference?
+    source_url: https://github.com/vllm-project/vllm/issues/11379
+    category: api
+    difficulty: easy
+    expected_source_paths:
+      - docs/getting_started/quickstart.md
+
+  - id: vllm-20810-multiple-backends
+    question: How to install and use vllm supporting more than one backend
+    source_url: https://github.com/vllm-project/vllm/issues/20810
+    category: concept
+    difficulty: medium
+    expected_source_paths:
+      - docs/getting_started/installation/gpu.cuda.inc.md
+
+  - id: vllm-8196-qwen2-tool-calling
+    question: I want to use tools calling with qwen2 model, any example?
+    source_url: https://github.com/vllm-project/vllm/issues/8196
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/tool_calling.md

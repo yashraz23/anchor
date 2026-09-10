@@ -519,6 +519,27 @@ def triad_cmd(
     _ = mean_or_none
 
 
+@app.command("ragas")
+def ragas_cmd(
+    run: int = typer.Option(0, help="Answer run to score. Defaults to the latest."),
+) -> None:
+    """Score a run with ragas, as a cross-check on the hand-written triad."""
+    _configure_logging()
+    from anchor.evaluate.ragas_check import run_ragas
+
+    report = run_ragas(get_settings(), run or None)
+
+    def show(label: str, value: float | None) -> None:
+        console.print(f"  {label:<20} {'-' if value is None else f'{value:.2f}'}")
+
+    console.print(f"[bold]ragas over run {report.run_id}[/bold]  ({len(report.scores)} scored)")
+    show("faithfulness", report.faithfulness)
+    show("answer relevancy", report.answer_relevancy)
+    show("context precision", report.context_precision)
+    if report.failures:
+        console.print(f"[yellow]  {report.failures} samples failed to score[/yellow]")
+
+
 @app.command("integrity")
 def integrity_cmd() -> None:
     """Measure how many fenced code blocks survive each chunking strategy whole.

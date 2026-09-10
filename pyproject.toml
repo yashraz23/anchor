@@ -33,10 +33,18 @@ dependencies = [
 
 [project.optional-dependencies]
 eval = [
-    # ragas is deliberately absent. Every published version through 0.4.3
-    # hard-requires langchain, langchain-community, langchain-openai and
-    # openai, and this project's stated constraint is that LangChain does not
-    # enter the tree. The triad is implemented in anchor/evaluate/triad.py.
+    # ragas drags in LangChain. That was originally disallowed and the triad was
+    # implemented directly in anchor/evaluate/triad.py as a result; both now
+    # run, and the README reports how far apart they land. langchain-anthropic
+    # is what lets ragas be driven by Claude rather than OpenAI.
+    "ragas>=0.4.3",
+    "langchain-anthropic>=0.3",
+    # ragas 0.4.3 still imports langchain_community.chat_models.vertexai, which
+    # langchain-community removed in 0.4. Pinned below that until ragas stops
+    # importing it. This is the maintenance cost of the dependency, recorded
+    # here so the next person does not rediscover it.
+    "langchain-community<0.4",
+    "langchain-huggingface>=0.1",
     "wandb>=0.18",
     "langfuse>=2.53",
     "pandas>=2.2",

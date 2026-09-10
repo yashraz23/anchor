@@ -134,7 +134,7 @@ reaction count, then curating against retrieval evidence rather than titles.
 | | |
 |---|---|
 | Candidates harvested | 563 |
-| Curated so far | 33 |
+| Curated so far | 52 |
 | Target | 60-80 |
 
 Two curation rules are worth stating, because they are what stop the set
@@ -274,35 +274,35 @@ rather than whichever retrieves the right material.
 
 | Chunking | Retrieval | recall@1 | recall@3 | recall@5 | recall@10 | recall@20 |
 |---|---|---|---|---|---|---|
-| `fixed` | dense | 0.23 | 0.47 | 0.64 | 0.74 | 0.74 |
-| `fixed` | sparse | 0.15 | 0.24 | 0.24 | 0.24 | 0.27 |
-| `fixed` | hybrid (RRF) | 0.30 | 0.55 | 0.68 | 0.76 | 0.79 |
-| `fixed` | hybrid (RRF) + rerank | 0.35 | 0.64 | 0.70 | 0.77 | 0.79 |
-| `structure_aware` | dense | 0.45 | 0.61 | 0.67 | 0.74 | 0.91 |
-| `structure_aware` | sparse | 0.18 | 0.24 | 0.24 | 0.24 | 0.27 |
-| `structure_aware` | hybrid (RRF) | 0.48 | 0.67 | 0.71 | 0.79 | 0.94 |
-| `structure_aware` | **hybrid (RRF) + rerank** | **0.55** | **0.89** | **0.91** | **0.92** | **0.94** |
+| `fixed` | dense | 0.21 | 0.53 | 0.67 | 0.76 | 0.82 |
+| `fixed` | sparse | 0.17 | 0.23 | 0.23 | 0.23 | 0.25 |
+| `fixed` | hybrid (RRF) | 0.32 | 0.60 | 0.74 | 0.81 | 0.85 |
+| `fixed` | hybrid (RRF) + rerank | 0.42 | 0.68 | 0.77 | 0.84 | 0.85 |
+| `structure_aware` | dense | 0.48 | 0.64 | 0.71 | 0.78 | 0.92 |
+| `structure_aware` | sparse | 0.19 | 0.23 | 0.23 | 0.23 | 0.25 |
+| `structure_aware` | hybrid (RRF) | 0.54 | 0.72 | 0.76 | 0.83 | 0.96 |
+| `structure_aware` | **hybrid (RRF) + rerank** | **0.55** | **0.90** | **0.92** | **0.95** | **0.96** |
 
-Run 3, commit `fd75f95`, 33 golden questions. Reproduce with
+Run 6, commit `aaf9399`, **52 golden questions**. Reproduce with
 `uv run anchor eval-retrieval`.
 
 Every cell runs the same questions, so the paired record is the honest
 comparison and a two-sided exact sign test is the appropriate check. It assumes
 only that a question separating the two configurations is a coin flip under the
-null, which is the least this comparison can assume. Ties carry no directional
-information and are excluded, which is what the sign test does by construction.
+null, which is the least this comparison can assume.
 
 | k | `structure_aware` better | `fixed` better | same | sign test |
 |---|---|---|---|---|
-| 1 | 11 | 1 | 21 | p = 0.0063 |
-| 3 | 11 | 0 | 22 | p = 0.0010 |
-| 5 | 9 | 0 | 24 | p = 0.0039 |
-| 10 | 7 | 0 | 26 | p = 0.0156 |
-| 20 | 7 | 0 | 26 | p = 0.0156 |
+| 1 | 13 | 3 | 36 | p = 0.0213 |
+| 3 | **15** | **0** | 37 | **p = 0.0001** |
+| 5 | 11 | 0 | 41 | p = 0.0010 |
+| 10 | 8 | 0 | 44 | p = 0.0078 |
+| 20 | 8 | 0 | 44 | p = 0.0078 |
 
-**Structure-aware chunking wins 11 questions and loses none at k=3.** With 33
-questions that is significant at every depth measured, and the direction never
-reverses. It is a single eval set on one corpus, so it is evidence about vLLM's
+**Structure-aware chunking wins 15 questions and loses none at k=3.** The
+direction never reverses at any depth. Growing the set from 33 to 52 questions
+strengthened it rather than washing it out, which is what a real effect does.
+It is still one eval set on one corpus, so it is evidence about vLLM's
 documentation rather than a general claim about chunking.
 
 What the table supports:
@@ -316,8 +316,9 @@ What the table supports:
   passage, and a fixed-size window that starts and ends mid-sentence is a worse
   passage to score. Chunking and reranking are not independent choices, which is
   not visible from either row alone.
-- **Two questions are never retrieved by any configuration.** Both were flagged
-  as expected failures during curation, before the harness existed:
+- **Still only two questions are never retrieved by any configuration**, the
+  same two, after adding 19 more. Both were flagged as expected failures during
+  curation, before the harness existed:
   `vllm-6660-disable-logging`, whose answer lives only in `vllm/envs.py` because
   the env-var page is an mkdocs stub, and
   `vllm-23108-gpt-oss-builtin-python-tool`.
@@ -333,7 +334,9 @@ What the table supports:
 
 The headline result. Sweeping the abstention threshold trades how often the
 system answers at all against how well-grounded the answers it does give are.
-Over 33 golden questions and 306 extracted claims, run 5:
+Over 33 golden questions and 306 extracted claims, run 5. The golden set has
+since grown to 52; regenerating this curve needs API credit, so it is reported
+at the sample it was measured on rather than silently mixed:
 
 | Abstention threshold | Answered | Abstained | Answer rate | Delivered claims | Cited but unsupported | Uncited |
 |---|---|---|---|---|---|---|
@@ -410,14 +413,25 @@ measurements agreeing that `rerank_top_n` of 5 is larger than answers need is
 much stronger evidence than either alone. Every surplus span is paid for in
 input tokens on every query.
 
-**On ragas.** The spec named ragas for this. Every published version through
-0.4.3 hard-requires `langchain`, `langchain-community`, `langchain-openai` and
-`openai`, and the installed one failed to import on a `langchain_community`
-incompatibility. Since the project's stated constraint is that LangChain does
-not enter the tree, the triad is computed in
-[`triad.py`](src/anchor/evaluate/triad.py) instead. The tradeoff is a lost
-resume keyword against five heavy dependencies and a metric whose definition
-would live outside this repository.
+**On ragas.** The triad above is computed in
+[`triad.py`](src/anchor/evaluate/triad.py) rather than by ragas, because ragas
+requires LangChain, which was out of bounds when it was written. LangChain was
+later permitted, so ragas is now wired up as a *cross-check* rather than a
+replacement: an in-house metric nobody has calibrated is a number without a
+reference class, and running the standard implementation over the same answers
+says how far the two land apart.
+
+`uv run anchor ragas` drives ragas with Claude rather than OpenAI, so a
+disagreement is about the metric and not about which model judged. Two things
+were needed to make it run, both recorded because they are the maintenance cost
+of the dependency: ragas 0.4.3 still imports
+`langchain_community.chat_models.vertexai`, removed in langchain-community 0.4,
+so that is pinned below 0.4; and Opus 5 rejects `temperature` outright, while
+LangChain sends one by default and ragas overwrites it per call, so both are
+suppressed.
+
+The comparison itself has not been run: the API credit balance ran out first.
+The numbers will go here when it is.
 
 ### Verifier agreement
 
@@ -599,7 +613,7 @@ table in this README can be traced back to the commit that produced it.
 | Ingestion, version-tagged, 1729 documents | done |
 | Both chunking strategies, compared | done |
 | Hybrid retrieval, RRF, cross-encoder rerank | done |
-| Golden set from real vLLM issues | 33 of a 60-80 target |
+| Golden set from real vLLM issues | 52 of a 60-80 target |
 | Generation with inline citation | done |
 | Symbol oracle, 13369 symbols | done |
 | Claim extraction, span attribution, LLM judge | done |
