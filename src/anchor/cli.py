@@ -11,13 +11,14 @@ import json
 import logging
 import sys
 import textwrap
+from pathlib import Path
 
 import typer
 from rich.console import Console
 
 from anchor import db
 from anchor.chunk.pipeline import chunk_corpus
-from anchor.config import ChunkStrategy, RetrievalMode, get_settings
+from anchor.config import REPO_ROOT, ChunkStrategy, RetrievalMode, get_settings
 from anchor.evaluate.chunk_integrity import BUCKETS
 from anchor.evaluate.integrity_run import measure_integrity
 from anchor.index.pipeline import build_index
@@ -26,6 +27,8 @@ from anchor.ingest.pipeline import ingest as run_ingest
 app = typer.Typer(no_args_is_help=True, add_completion=False, help=__doc__)
 db_app = typer.Typer(no_args_is_help=True, help="Database lifecycle.")
 app.add_typer(db_app, name="db")
+golden_app = typer.Typer(no_args_is_help=True, help="Golden-set curation workflow.")
+app.add_typer(golden_app, name="golden")
 
 console = Console()
 
@@ -206,6 +209,95 @@ def search_cmd(
         body = hit.text if len(hit.text) <= 300 else hit.text[:300] + "..."
         console.print(textwrap.indent(body, "    "), markup=False)
         console.print()
+
+
+@golden_app.command("harvest")
+def golden_harvest(
+    labels: str = typer.Option("usage,documentation", help="Comma-separated issue labels."),
+    pages: int = typer.Option(3, help="Pages of 100 issues per label."),
+) -> None:
+    """Fetch candidate questions from real vLLM issues. Requires the gh CLI.
+
+    Produces candidates only. Whether a question is answerable from the corpus
+    is a curation judgement, made against evidence, not here.
+    """
+    _configure_logging()
+    from anchor.evaluate.harvest import fetch_candidates, write_candidates
+
+    seen: set[int] = set()
+    unique = []
+    for label in [x.strip() for x in labels.split(",") if x.strip()]:
+        got = fetch_candidates(label=label, pages=pages)
+        console.print(f"  {label:>16}  {len(got)} issues")
+        for candidate in got:
+            if candidate.number not in seen:
+                seen.add(candidate.number)
+                unique.append(candidate)
+
+    out = REPO_ROOT / "data" / "golden" / "candidates.jsonl"
+    console.print(f"wrote {write_candidates(out, unique)} unique candidates -> {out}")
+
+
+@golden_app.command("propose")
+def golden_propose(
+    limit: int = typer.Option(60, help="How many candidates to gather evidence for."),
+    out: str = typer.Option("", help="Where to write the report. Defaults to stdout."),
+) -> None:
+    """Run retrieval over candidates and write the spans, for human review.
+
+    Decides nothing. Auto-accepting whatever retrieval returned would make the
+    golden set a transcript of current behaviour, and a set that agrees with the
+    system by construction cannot measure it.
+    """
+    _configure_logging()
+    from anchor.evaluate.harvest import read_candidates
+    from anchor.evaluate.propose import gather_evidence, render_evidence
+
+    candidates = read_candidates(REPO_ROOT / "data" / "golden" / "candidates.jsonl")
+    if not candidates:
+        console.print("[yellow]no candidates; run `anchor golden harvest` first[/yellow]")
+        return
+
+    report = render_evidence(gather_evidence(candidates, get_settings(), limit=limit))
+    if out:
+        Path(out).write_text(report, encoding="utf-8")
+        console.print(f"wrote evidence -> {out}")
+    else:
+        console.print(report, markup=False)
+
+
+@golden_app.command("validate")
+def golden_validate() -> None:
+    """Check the golden set parses and that every expected document exists.
+
+    A malformed entry does not crash anything downstream, it just quietly
+    produces a wrong number, which is the one failure this project cannot ship.
+    """
+    _configure_logging()
+    from anchor.evaluate.golden import load_golden
+
+    settings = get_settings()
+    queries = load_golden(settings.evaluate.golden_path)
+    console.print(f"[bold]{len(queries)} golden queries[/bold]")
+
+    missing: list[str] = []
+    with db.connect(settings) as conn:
+        commit = db.latest_ingested_commit(conn)
+        for query in queries:
+            for path in query.expected_source_paths:
+                row = conn.execute(
+                    "SELECT 1 FROM documents WHERE source_path = %s AND commit_sha = %s",
+                    (path, commit),
+                ).fetchone()
+                if row is None:
+                    missing.append(f"{query.id} -> {path}")
+
+    if missing:
+        console.print("[red]expected documents absent from the corpus:[/red]")
+        for item in missing:
+            console.print(f"  {item}")
+        raise typer.Exit(1)
+    console.print("[green]every expected document is present in the corpus[/green]")
 
 
 @app.command("integrity")

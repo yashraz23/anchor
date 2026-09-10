@@ -1,28 +1,229 @@
 # The golden set.
 #
-# 60 to 80 questions, each sourced from a real vLLM GitHub issue or discussion.
-# Synthetic question generation is deliberately not used: the point of this set
-# is that it carries a real query distribution, and "where did your eval
-# questions come from" is a question worth having a good answer to.
+# Every question here was filed by a real person on vLLM's issue tracker.
+# Nothing is synthesised. A model-generated set is written in the vocabulary of
+# the documentation it was generated from, so it flatters retrieval and measures
+# the wrong thing; real issues carry the vocabulary gap between how users ask
+# and how docs are written, which is the failure this system has to survive.
 #
-# Rules for adding an entry:
-#   * source_url is required and must point at the issue or discussion it came
-#     from. An entry without one cannot be defended and does not belong here.
-#   * expected_answer is written from the documentation, not from the model.
-#   * expected_chunk_ids is filled by `anchor golden link` after ingest, because
-#     chunk IDs are only stable within one (strategy, commit) pair.
-#   * difficulty: easy | medium | hard
-#   * category: cli_flag | config | api | concept | troubleshooting | perf
+# Provenance: harvested with `anchor golden harvest` from issues labelled
+# `usage` and `documentation`, sorted by reaction count, then curated against
+# retrieval evidence (`anchor golden propose`). 563 candidates harvested,
+# reviewed on evidence, and narrowed to the entries below.
 #
-# Schema of one entry:
+# Curation rules, applied to every entry:
+#   * source_url is required and points at the issue it came from. An entry that
+#     cannot be traced back to a real question cannot be defended.
+#   * expected_source_paths must exist in the ingested corpus and must actually
+#     contain the answer. Each was checked by hand against the checkout.
+#   * Questions retrieval currently FAILS are deliberately kept. A set built only
+#     from what the system already finds is a transcript of current behaviour and
+#     cannot measure anything. See vllm-6660-disable-logging.
+#   * Questions no documentation can answer are dropped, not marked hard. Issue
+#     9750 ("Can I get the loss of model directly?") and 13609 (sparse
+#     embeddings) were rejected on that basis.
+#   * expected_answer is written from the documentation. Where it is blank it has
+#     not been transcribed from the source yet; it is never filled from a model's
+#     output.
 #
-#   - question: "..."
-#     source_url: "https://github.com/vllm-project/vllm/issues/NNNN"
-#     expected_answer: "..."
-#     category: cli_flag
-#     difficulty: easy
-#     expected_chunk_ids: []
+# expected_chunk_ids is intentionally absent: chunk ids are stable only within
+# one (strategy, commit) pair, so they are resolved from the paths at eval time.
 #
-# Empty until week 2. Nothing is invented to fill it.
+# STATUS: 21 of a target 60-80. This is a first curated batch, not the finished
+# set. The remaining candidates are in candidates.jsonl awaiting review.
 
-queries: []
+queries:
+  - id: vllm-4449-enforce-eager
+    question: what is enforce_eager
+    source_url: https://github.com/vllm-project/vllm/issues/4449
+    category: config
+    difficulty: easy
+    expected_source_paths:
+      - vllm/config/model.py
+      - docs/design/debug_vllm_compile.md
+    expected_answer: >-
+      enforce_eager controls whether vLLM always uses eager mode PyTorch.
+      Passing --enforce-eager turns off the vLLM-torch.compile integration and
+      runs entirely in eager mode, which also turns off CUDA graphs.
+    notes: >-
+      Retrieval ranks the correct span third; the top two hits are unrelated
+      pages that merely discuss eager execution.
+
+  - id: vllm-6641-max-num-seqs-and-max-model-len
+    question: What do max_num_seqs and max_model_len do
+    source_url: https://github.com/vllm-project/vllm/issues/6641
+    category: config
+    difficulty: easy
+    expected_source_paths:
+      - docs/configuration/conserving_memory.md
+      - vllm/config/model.py
+    expected_answer: >-
+      max_model_len limits the context length of the model and max_num_seqs
+      limits the maximum batch size. Both reduce memory usage.
+
+  - id: vllm-18582-gpu-memory-utilization
+    question: How to use the appropriate --gpu-memory-utilization
+    source_url: https://github.com/vllm-project/vllm/issues/18582
+    category: cli_flag
+    difficulty: medium
+    expected_source_paths:
+      - vllm/config/cache.py
+      - docs/configuration/conserving_memory.md
+
+  - id: vllm-6660-disable-logging
+    question: How to disable logging
+    source_url: https://github.com/vllm-project/vllm/issues/6660
+    category: config
+    difficulty: hard
+    expected_source_paths:
+      - vllm/envs.py
+    notes: >-
+      Kept deliberately as a known retrieval failure. The answer is an
+      environment variable, and vLLM's env-var doc page is an mkdocs snippet
+      stub that pulls from vllm/envs.py at build time, so the prose lives only
+      in source. Current retrieval returns unrelated spans.
+
+  - id: vllm-3990-fp8-vs-fp8-e5m2
+    question: When to use fp8 and when to use fp8_e5m2
+    source_url: https://github.com/vllm-project/vllm/issues/3990
+    category: config
+    difficulty: medium
+    expected_source_paths:
+      - vllm/config/cache.py
+      - docs/features/quantization/llm_compressor/fp8.md
+
+  - id: vllm-5493-fp8-kv-cache-scales
+    question: How do I get the FP8 scaling factors for KV cache?
+    source_url: https://github.com/vllm-project/vllm/issues/5493
+    category: config
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/quantization/quantized_kvcache.md
+
+  - id: vllm-7978-gguf-chat-template
+    question: run gguf model need template, how to write?
+    source_url: https://github.com/vllm-project/vllm/issues/7978
+    category: config
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/quantization/gguf.md
+
+  - id: vllm-8664-generation-config-default
+    question: how to let vllm use the generation_config.json as the default generation config
+    source_url: https://github.com/vllm-project/vllm/issues/8664
+    category: config
+    difficulty: medium
+    expected_source_paths:
+      - docs/models/generative_models.md
+      - vllm/config/model.py
+
+  - id: vllm-17700-reasoning-thinking-budget
+    question: How to limit the thinking budget for reasoning mode
+    source_url: https://github.com/vllm-project/vllm/issues/17700
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/reasoning_outputs.md
+
+  - id: vllm-32807-tensorizer-s3
+    question: How to use tensorizer to load models from S3 with vLLM
+    source_url: https://github.com/vllm-project/vllm/issues/32807
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/models/extensions/tensorizer.md
+
+  - id: vllm-14078-logits-processor-state
+    question: How to maintain per-sequence state in custom LogitsProcessor?
+    source_url: https://github.com/vllm-project/vllm/issues/14078
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/features/custom_logitsprocs.md
+
+  - id: vllm-11126-eagle-speculative-decoding
+    question: how to use EAGLE on vLLM?
+    source_url: https://github.com/vllm-project/vllm/issues/11126
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/features/speculative_decoding/eagle.md
+
+  - id: vllm-7981-generate-logits-not-text
+    question: how can I use vllm to generate logits instead of text
+    source_url: https://github.com/vllm-project/vllm/issues/7981
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/models/generative_models.md
+      - docs/features/custom_logitsprocs.md
+
+  - id: vllm-7367-llm-class-with-async-engine
+    question: how to use LLM class with AsyncLLMEngine
+    source_url: https://github.com/vllm-project/vllm/issues/7367
+    category: api
+    difficulty: medium
+    expected_source_paths:
+      - docs/design/arch_overview.md
+
+  - id: vllm-5227-serve-through-llm-object
+    question: How to start inference serving through `LLM` object
+    source_url: https://github.com/vllm-project/vllm/issues/5227
+    category: api
+    difficulty: easy
+    expected_source_paths:
+      - docs/getting_started/quickstart.md
+
+  - id: vllm-25835-inductor-remote-cache-safety
+    question: Is it safe to enable TorchInductor remote cache (Redis) in vLLM?
+    source_url: https://github.com/vllm-project/vllm/issues/25835
+    category: concept
+    difficulty: hard
+    expected_source_paths:
+      - docs/design/torch_compile.md
+      - docs/usage/security.md
+
+  - id: vllm-12247-deepseek-v3-cuda-118
+    question: Does vLLM support running the DeepSeek-V3 model with CUDA 11.8?
+    source_url: https://github.com/vllm-project/vllm/issues/12247
+    category: troubleshooting
+    difficulty: medium
+    expected_source_paths:
+      - docs/getting_started/installation/gpu.md
+
+  - id: vllm-30464-local-precompiled-wheel
+    question: How can I use the local pre-compiled wheel of vllm
+    source_url: https://github.com/vllm-project/vllm/issues/30464
+    category: concept
+    difficulty: medium
+    expected_source_paths:
+      - docs/getting_started/installation/gpu.cuda.inc.md
+
+  - id: vllm-44576-claude-code-integration
+    question: Claude code does not work with vLLM
+    source_url: https://github.com/vllm-project/vllm/issues/44576
+    category: troubleshooting
+    difficulty: medium
+    expected_source_paths:
+      - docs/serving/integrations/claude_code.md
+
+  - id: vllm-17843-amd-apu-support
+    question: Inquiry About AMD APU Support (e.g., AMD AI Max+ 395) and Handling in vLLM
+    source_url: https://github.com/vllm-project/vllm/issues/17843
+    category: concept
+    difficulty: medium
+    expected_source_paths:
+      - docs/getting_started/installation/README.md
+      - docs/getting_started/installation/gpu.md
+
+  - id: vllm-23108-gpt-oss-builtin-python-tool
+    question: how to use built-in python tool of gpt-oss-20b after starting vllm server
+    source_url: https://github.com/vllm-project/vllm/issues/23108
+    category: api
+    difficulty: hard
+    expected_source_paths:
+      - docs/features/tool_calling.md
+    notes: >-
+      Another known failure. Retrieval currently returns the security and
+      integrations pages with high reranker confidence, which is a false
+      positive worth measuring rather than hiding.

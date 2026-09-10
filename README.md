@@ -118,6 +118,38 @@ reranking knobs are experiment variables, and the golden set is what decides
 them. The golden questions come from real GitHub issues, so this gap is exactly
 the distribution they will test.
 
+### The golden set
+
+60 to 80 questions, every one filed by a real person on vLLM's issue tracker.
+Nothing is synthesised, and that is the point: a model-generated set is written
+in the vocabulary of the documentation it was generated from, so it flatters
+retrieval and measures the wrong thing.
+
+Built by harvesting issues labelled `usage` and `documentation`, sorted by
+reaction count, then curating against retrieval evidence rather than titles.
+
+| | |
+|---|---|
+| Candidates harvested | 563 |
+| Curated so far | 21 |
+| Target | 60-80 |
+
+Two curation rules are worth stating, because they are what stop the set
+measuring the wrong thing:
+
+- **Questions the system currently fails are kept.** A set built only from what
+  retrieval already finds is a transcript of current behaviour and cannot
+  measure anything. "How to disable logging" is in the set precisely because the
+  pipeline gets it wrong today.
+- **Questions no documentation can answer are dropped, not marked hard.**
+  "Can I get the loss of model directly?" was rejected on that basis, as was a
+  sparse-embeddings question with no corresponding page. Keeping them would make
+  retrieval look broken when the corpus, not the retriever, is the limit.
+
+Entries store expected *document paths*, not chunk ids: chunk ids are stable
+only within one (strategy, commit) pair, so pinning them in a version-controlled
+file would rot on the next re-chunk.
+
 ### Retrieval: recall@k by chunking strategy and retrieval mode
 
 Both chunking strategies are indexed at the same time and queried identically,
@@ -210,6 +242,10 @@ uv run anchor index       # embed into pgvector and build the tsvectors
 uv run anchor integrity   # the code-block integrity table above
 
 uv run anchor search "what does max_num_seqs do and what is its default"
+
+uv run anchor golden harvest    # candidate questions from real vLLM issues (needs gh)
+uv run anchor golden propose    # retrieval evidence for each, for human review
+uv run anchor golden validate   # every expected document exists in the corpus
 ```
 
 Re-running `ingest` stays on the commit already ingested. Advancing to the
