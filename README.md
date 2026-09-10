@@ -381,6 +381,39 @@ judge scores the same claims independently and agrees on 98% of them; see
 verifier agreement below. The symbol oracle covers the checkable subset exactly
 and found no contradictions across the 3 answers it had jurisdiction over.
 
+### The RAG triad
+
+| Metric | Score | Notes |
+|---|---|---|
+| Faithfulness | see grounding above | measured against cited spans, plus the symbol oracle |
+| Answer relevance | **1.00** | every answer addressed its question |
+| Context relevance | **0.55** | share of retrieved spans that were actually useful |
+
+33 answers, run 5, $0.82. Fully relevant context on only 4 of 33 questions.
+
+**Answer relevance is 1.00 because honest non-answers count as relevant.** An
+answer correctly reporting that the documentation does not cover something has
+addressed the question. Scoring that as irrelevant would reward guessing, which
+is the opposite of what the abstention policy is for, so the rubric says so
+explicitly.
+
+**Context relevance of 0.55 is the actionable number, and it corroborates an
+earlier finding by a different route.** Generation showed 23% of supplied spans
+were never cited. The triad, judging span usefulness independently and without
+seeing which were cited, puts 45% of spans as not useful. Two unrelated
+measurements agreeing that `rerank_top_n` of 5 is larger than answers need is
+much stronger evidence than either alone. Every surplus span is paid for in
+input tokens on every query.
+
+**On ragas.** The spec named ragas for this. Every published version through
+0.4.3 hard-requires `langchain`, `langchain-community`, `langchain-openai` and
+`openai`, and the installed one failed to import on a `langchain_community`
+incompatibility. Since the project's stated constraint is that LangChain does
+not enter the tree, the triad is computed in
+[`triad.py`](src/anchor/evaluate/triad.py) instead. The tradeoff is a lost
+resume keyword against five heavy dependencies and a metric whose definition
+would live outside this repository.
+
 ### Verifier agreement
 
 Three verifiers, deliberately ordered cheapest-first. The symbol oracle is exact

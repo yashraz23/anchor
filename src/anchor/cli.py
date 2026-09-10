@@ -475,6 +475,31 @@ def ground_cmd(
         Path(out).write_text(table + "\n", encoding="utf-8")
 
 
+@app.command("triad")
+def triad_cmd(
+    run: int = typer.Option(0, help="Answer run to score. Defaults to the latest."),
+) -> None:
+    """Score answer relevance and context relevance. Calls the judge model."""
+    _configure_logging()
+    from anchor.evaluate.triad import mean_or_none
+    from anchor.evaluate.triad_run import report_cost, run_triad
+
+    settings = get_settings()
+    report = run_triad(settings, run or None)
+
+    def show(label: str, value: float | None) -> None:
+        console.print(f"  {label:<22} {'-' if value is None else f'{value:.2f}'}")
+
+    console.print(f"[bold]triad over run {report.run_id}[/bold]  ({len(report.results)} answers)")
+    show("answer relevance", report.answer_relevance)
+    show("context relevance", report.context_relevance)
+    console.print(f"  fully relevant context {report.fully_relevant_contexts}")
+    cost = report_cost(report, settings)
+    if cost is not None:
+        console.print(f"  cost                   ${cost:.4f}")
+    _ = mean_or_none
+
+
 @app.command("integrity")
 def integrity_cmd() -> None:
     """Measure how many fenced code blocks survive each chunking strategy whole.

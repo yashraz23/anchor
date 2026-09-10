@@ -33,7 +33,10 @@ dependencies = [
 
 [project.optional-dependencies]
 eval = [
-    "ragas>=0.2",
+    # ragas is deliberately absent. Every published version through 0.4.3
+    # hard-requires langchain, langchain-community, langchain-openai and
+    # openai, and this project's stated constraint is that LangChain does not
+    # enter the tree. The triad is implemented in anchor/evaluate/triad.py.
     "wandb>=0.18",
     "langfuse>=2.53",
     "pandas>=2.2",
