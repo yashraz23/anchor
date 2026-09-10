@@ -408,6 +408,24 @@ def answer_golden_cmd(
         )
 
 
+@app.command("oracle-build")
+def oracle_build_cmd() -> None:
+    """Walk the pinned vLLM checkout and record every symbol it declares.
+
+    This is what makes a subset of faithfulness checks ground-truthed rather
+    than LLM-judged.
+    """
+    _configure_logging()
+    from anchor.ground.oracle_build import build_oracle
+
+    report = build_oracle(get_settings())
+    console.print(f"[bold]vLLM {report.vllm_version}[/bold] @ {report.commit_sha[:12]}")
+    console.print(f"  files scanned   {report.files_scanned}")
+    for kind, count in report.by_kind.items():
+        console.print(f"  {kind:>14}  {count}")
+    console.print(f"  {'total':>14}  {report.total}")
+
+
 @app.command("integrity")
 def integrity_cmd() -> None:
     """Measure how many fenced code blocks survive each chunking strategy whole.

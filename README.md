@@ -197,6 +197,69 @@ taken verbatim from those answers. Publishing the unfixed number would have
 been a hallucination claim about the model that was really a bug in the
 measurement.
 
+### The symbol oracle
+
+The reason a subset of faithfulness checks here are ground-truthed rather than
+LLM-judged. `--max-num-seqs` either exists in vLLM's argument parser at a pinned
+commit or it does not, and no judge's opinion changes that.
+
+Symbols are recovered by walking the AST of the pinned checkout, never by
+importing vLLM or running `--help`: both need the package installed with CUDA,
+and the oracle has to run in CI.
+
+| Kind | Symbols |
+|---|---|
+| CLI flags | 433 |
+| Config keys | 3603 |
+| Classes | 5366 |
+| Functions | 3967 |
+| **Total** | **13369** |
+
+Built from 2392 files at v0.28.1rc0. Verified: real flags resolve, and an
+invented `--enable-turbo-mode` in a serve command is returned as
+`contradicted`, not merely unsupported, because the source says otherwise.
+
+**vLLM declares its command line two ways, and missing one produced false
+accusations.** Most flags are string literals in `add_argument`. The rest are
+generated in a loop with no literal anywhere:
+
+```python
+frontend_kwargs = get_kwargs(cls)
+for key, value in frontend_kwargs.items():
+    group.add_argument(*extra, f"--{key.replace('_', '-')}", **value)
+```
+
+A literals-only oracle reported `--tool-call-parser`, `--chat-template` and
+`--enable-auto-tool-choice` as non-existent. All three are real. The second
+mechanism is now detected structurally, by finding functions that both call
+`get_kwargs` and pass an f-string to `add_argument`, and fields are inherited
+through base classes because a subclass inherits its parent's flags.
+
+**Jurisdiction is narrow, on purpose.** The first version judged every `--flag`
+and every backticked identifier in an answer. Across 33 real answers that
+produced 106 checkable mentions with a 42% "not found" rate, and almost none
+were hallucinations:
+
+| What it actually was | Example |
+|---|---|
+| Another tool's flag, used correctly | `pip install --editable`, `numactl --cpunodebind` |
+| A config *value*, not a field name | `fp8_e5m2` is a value of `kv_cache_dtype` |
+| A variable from the model's own example | `a_val`, `b_val`, `target_token` |
+| Another library's API parameter | `max_new_tokens` is HuggingFace's |
+
+An oracle that reports those as contradictions is worse than no oracle, because
+its verdicts carry the authority of ground truth. So it now rules only on flags
+appearing inside an actual vLLM invocation, and does not adjudicate config keys
+at all: a backticked identifier is as likely to be a value, a local variable, or
+another library's parameter, and the name alone cannot distinguish them.
+
+After narrowing, the same 33 answers yield 7 adjudicable flag claims and **0
+contradictions**. Every flag the answers attributed to vLLM is real.
+
+The cost is recall, and that is the right way round. A hallucinated flag outside
+a command line falls through to the LLM judge, which is the fallback the design
+already has. A false contradiction has no such safety net.
+
 ### Retrieval: recall@k by chunking strategy and retrieval mode
 
 Both chunking strategies are indexed at the same time and queried identically,
@@ -347,6 +410,7 @@ uv run anchor eval-retrieval    # the recall@k sweep; writes a row to `runs`
 uv run anchor ask "what does max_num_seqs do"   # one cited answer
 uv run anchor golden sync                       # golden set into Postgres
 uv run anchor answer-golden --yes               # answer the whole set; costs money
+uv run anchor oracle-build                      # populate the symbol oracle
 ```
 
 Re-running `ingest` stays on the commit already ingested. Advancing to the
