@@ -41,6 +41,24 @@ services:
       - anchor-hfcache:/app/data/cache
     profiles: ["app"]
 
+  demo:
+    build: .
+    container_name: anchor-demo
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ANCHOR_PG_DSN: postgresql://anchor:anchor@db:5432/anchor
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      HF_HOME: /app/data/cache
+      GRADIO_SERVER_NAME: 0.0.0.0
+    command: ["python", "-m", "anchor.demo.app"]
+    ports:
+      - "7860:7860"
+    volumes:
+      - anchor-hfcache:/app/data/cache
+    profiles: ["app"]
+
 volumes:
   anchor-pgdata:
   anchor-hfcache:

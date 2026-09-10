@@ -326,6 +326,8 @@ What the table supports:
 
 ### Grounding: strictness versus completeness
 
+![Strictness versus completeness](docs/tradeoff.png)
+
 The headline result. Sweeping the abstention threshold trades how often the
 system answers at all against how well-grounded the answers it does give are.
 Over 33 golden questions and 306 extracted claims, run 5:
@@ -533,6 +535,21 @@ Every stage after `ingest` pins itself to the commit the corpus was ingested at,
 read back from the database. vLLM's main branch moves several times a day, so a
 stage that re-resolved the branch tip would check out a tree that no longer
 matches the `documents` rows.
+
+Serve it:
+
+```bash
+docker compose --profile app up      # API on :8080, demo on :7860
+# or locally
+uv run uvicorn anchor.api.app:app --port 8080
+uv run python -m anchor.demo.app     # Gradio on :7860
+```
+
+`POST /ask` returns the answer *and* its evidence: which spans were retrieved,
+which of them the answer cited, how many claims their spans support, and why an
+answer was withheld when it was. `GET /health` reports corpus counts rather than
+process liveness, because a server answering against an empty index is up and
+useless.
 
 Run the checks the way CI does:
 
