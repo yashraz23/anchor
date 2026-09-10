@@ -12,7 +12,7 @@ cosine distance against an HNSW index built with `vector_cosine_ops`.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
@@ -20,6 +20,21 @@ if TYPE_CHECKING:  # pragma: no cover - import cost is why this is guarded
     from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
+
+
+class PassageEncoder(Protocol):
+    """The slice of embedding behaviour downstream consumers need.
+
+    Declared as a protocol for the same reason the tokenizer is: it lets the
+    grounding layer be tested against a hand-built encoder whose similarities
+    are controllable, instead of loading a real model to assert a policy
+    decision that has nothing to do with the model.
+    """
+
+    @property
+    def dimension(self) -> int: ...
+
+    def embed_passages(self, texts: list[str], batch_size: int) -> NDArray[np.float32]: ...
 
 
 def with_query_instruction(text: str, instruction: str) -> str:

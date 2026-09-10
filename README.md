@@ -326,12 +326,63 @@ What the table supports:
 
 ### Grounding: strictness versus completeness
 
-The headline chart. Sweeping the abstention threshold trades hallucination rate
-against how many questions get answered at all.
+The headline result. Sweeping the abstention threshold trades how often the
+system answers at all against how well-grounded the answers it does give are.
+Over 33 golden questions and 306 extracted claims, run 5:
 
-| Abstention threshold | Answered | Abstained | Unsupported claims | Contradicted claims | Cost / query |
-|---|---|---|---|---|---|
-| TODO | TODO | TODO | TODO | TODO | TODO |
+| Abstention threshold | Answered | Abstained | Answer rate | Delivered claims | Cited but unsupported | Uncited |
+|---|---|---|---|---|---|---|
+| 0.00 | 32 | 1 | 97% | 303 | 1 (0%) | 64 (21%) |
+| 0.30 | 31 | 2 | 94% | 293 | 1 (0%) | 57 (19%) |
+| 0.50 | 31 | 2 | 94% | 293 | 1 (0%) | 57 (19%) |
+| 0.60 | 26 | 7 | 79% | 238 | 0 (0%) | 37 (16%) |
+| 0.70 | 21 | 12 | 64% | 186 | 0 (0%) | 21 (11%) |
+| 0.80 | 15 | 18 | 45% | 122 | 0 (0%) | 7 (6%) |
+| 0.90 | 11 | 22 | 33% | 72 | 0 (0%) | 0 (0%) |
+
+Reproduce with `uv run anchor ground`. The sweep calls no model: claims are
+scored once and re-thresholded, so the whole curve costs one pass over answers
+already paid for.
+
+**The two failure columns are separate on purpose, and merging them produced a
+number four times too large.** A claim that cites a span which does not support
+it asserted something its own evidence contradicts. A claim that cites nothing
+is merely unattributable. The first version of this table folded both into one
+"unsupported" figure and reported **37%**. Split apart:
+
+| | Claims |
+|---|---|
+| Supported by their cited span | 193 |
+| Cited a span that does not support them | **1** |
+| Cited nothing at all | 112 |
+
+The strict faithfulness failure rate is 1 claim in 306. The 37% was almost
+entirely claims with no citation, which is a different and much less alarming
+problem, and publishing it as a hallucination rate would have been wrong.
+
+**Honest hedging is not a hallucination.** Many uncited sentences were the model
+correctly declining: "The provided spans don't cover S3 credential
+configuration", "I'd need documentation covering sparse embeddings to answer
+this". Those assert nothing about vLLM. Counting them as unsupported claims
+scores the exact behaviour the abstention policy exists to encourage, and would
+push the system toward confident guessing. They are now detected and excluded
+from the faithfulness denominator, which moved the uncited rate from 23% to 21%
+and, more importantly, stopped penalising the right answer.
+
+**What the curve shows.** Raising the threshold from 0.00 to 0.90 cuts the
+answer rate from 97% to 33% and drives uncited claims from 21% to zero. The
+knee is around 0.60 to 0.70, where the system still answers 64% to 79% of
+questions while more than halving the uncited rate. There is no threshold at
+which strictly unsupported claims are a problem, because there was only ever one.
+
+**Limits of this measurement, stated plainly.** Attribution is cosine
+similarity between a claim and its cited span, which is a proxy for support and
+not support itself: a claim can sit close to its span and still invert its
+meaning. That specific case is what the LLM judge is for, and the judge is not
+built yet, so the "cited but unsupported" column is currently a similarity
+floor rather than a semantic verdict. The symbol oracle covers the checkable
+subset exactly and found no contradictions across the 3 answers it had
+jurisdiction over.
 
 ### Verifier agreement
 

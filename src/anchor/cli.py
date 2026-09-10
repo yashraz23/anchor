@@ -426,6 +426,37 @@ def oracle_build_cmd() -> None:
     console.print(f"  {'total':>14}  {report.total}")
 
 
+@app.command("ground")
+def ground_cmd(
+    run: int = typer.Option(0, help="Answer run to score. Defaults to the latest."),
+    out: str = typer.Option("", help="Write the tradeoff table here as well."),
+) -> None:
+    """Score stored answers and sweep the abstention threshold.
+
+    Calls no model: the curve is a re-thresholding of one scoring pass over
+    answers already paid for.
+    """
+    _configure_logging()
+    from anchor.ground.ground_run import ground_run
+    from anchor.ground.tradeoff import render_curve
+
+    settings = get_settings()
+    report = ground_run(settings, run or None)
+
+    console.print(f"[bold]grounded run {report.run_id}[/bold]")
+    console.print(f"  answers scored        {report.answers}")
+    console.print(f"  claims extracted      {report.claims}")
+    console.print(f"  claims citing nothing {report.uncited_claims}")
+    console.print(f"  answers the oracle could check  {report.oracle_checked}")
+    console.print(f"  answers it contradicted         {report.oracle_contradicted}")
+    console.print()
+
+    table = render_curve(report.points)
+    console.print(table, markup=False)
+    if out:
+        Path(out).write_text(table + "\n", encoding="utf-8")
+
+
 @app.command("integrity")
 def integrity_cmd() -> None:
     """Measure how many fenced code blocks survive each chunking strategy whole.
