@@ -37,8 +37,16 @@ def schema_sql() -> str:
 
 
 def init_schema(settings: Settings) -> None:
-    """Apply the schema. Idempotent."""
-    with connect(settings) as conn:
+    """Apply the schema. Idempotent.
+
+    Connects *without* registering the pgvector adapters, unlike every other
+    caller. Registration looks up the `vector` type in the catalogue, and on a
+    fresh database that type does not exist until this function's own DDL runs
+    CREATE EXTENSION. Using `connect` here fails on exactly the case this
+    function exists to handle, and only on a database nobody has initialised
+    yet, which is why it survives local testing and fails in CI.
+    """
+    with psycopg.connect(settings.pg_dsn, row_factory=dict_row) as conn:
         conn.execute(schema_sql())
         conn.commit()
 
