@@ -334,23 +334,27 @@ What the table supports:
 
 The headline result. Sweeping the abstention threshold trades how often the
 system answers at all against how well-grounded the answers it does give are.
-Over 33 golden questions and 306 extracted claims, run 5. The golden set has
-since grown to 52; regenerating this curve needs API credit, so it is reported
-at the sample it was measured on rather than silently mixed:
+Over 52 golden questions and 496 extracted claims:
 
 | Abstention threshold | Answered | Abstained | Answer rate | Delivered claims | Cited but unsupported | Uncited |
 |---|---|---|---|---|---|---|
-| 0.00 | 32 | 1 | 97% | 303 | 1 (0%) | 64 (21%) |
-| 0.30 | 31 | 2 | 94% | 293 | 1 (0%) | 57 (19%) |
-| 0.50 | 31 | 2 | 94% | 293 | 1 (0%) | 57 (19%) |
-| 0.60 | 26 | 7 | 79% | 238 | 0 (0%) | 37 (16%) |
-| 0.70 | 21 | 12 | 64% | 186 | 0 (0%) | 21 (11%) |
-| 0.80 | 15 | 18 | 45% | 122 | 0 (0%) | 7 (6%) |
-| 0.90 | 11 | 22 | 33% | 72 | 0 (0%) | 0 (0%) |
+| 0.00 | 52 | 0 | 100% | 496 | 1 (0%) | 107 (22%) |
+| 0.30 | 50 | 2 | 96% | 481 | 1 (0%) | 100 (21%) |
+| 0.50 | 49 | 3 | 94% | 476 | 1 (0%) | 98 (21%) |
+| 0.60 | 43 | 9 | 83% | 416 | 0 (0%) | 74 (18%) |
+| 0.70 | 35 | 17 | 67% | 323 | 0 (0%) | 48 (15%) |
+| 0.80 | 18 | 34 | 35% | 148 | 0 (0%) | 11 (7%) |
+| 0.90 | 10 | 42 | 19% | 77 | 0 (0%) | 1 (1%) |
+| 1.00 | 9 | 43 | 17% | 63 | 0 (0%) | 0 (0%) |
 
-Reproduce with `uv run anchor ground`. The sweep calls no model: claims are
-scored once and re-thresholded, so the whole curve costs one pass over answers
-already paid for.
+Run 9, 52 questions, 496 claims. Reproduce with `uv run anchor ground`. The
+sweep calls no model: claims are scored once and re-thresholded, so the whole
+curve costs one pass over answers already paid for.
+
+**One claim in 496 cited a span that does not support it.** The shape held when
+the set grew from 33 to 52 questions and the claim count from 306 to 496, which
+is the useful thing about re-running it: the strict faithfulness failure rate
+did not move.
 
 **The two failure columns are separate on purpose, and merging them produced a
 number four times too large.** A claim that cites a span which does not support
@@ -358,13 +362,20 @@ it asserted something its own evidence contradicts. A claim that cites nothing
 is merely unattributable. The first version of this table folded both into one
 "unsupported" figure and reported **37%**. Split apart:
 
-| | Claims |
+| | Claims (52 questions) |
 |---|---|
-| Supported by their cited span | 193 |
+| Supported by their cited span | 323 |
 | Cited a span that does not support them | **1** |
-| Cited nothing at all | 112 |
+| Cited nothing at all | 172 |
 
-The strict faithfulness failure rate is 1 claim in 306. The 37% was almost
+The strict faithfulness failure rate is 1 claim in 496.
+
+Two counts in this section differ and both are correct. The `claims` table
+records 172 claims citing nothing; the tradeoff table's "uncited" column shows
+107 at threshold 0. The difference is the 65 sentences that talk about the
+evidence rather than about vLLM, which are excluded from the faithfulness
+denominator but still stored, because a claim that was judged has to be
+inspectable afterwards. The 37% was almost
 entirely claims with no citation, which is a different and much less alarming
 problem, and publishing it as a hallucination rate would have been wrong.
 
@@ -394,10 +405,10 @@ and found no contradictions across the 3 answers it had jurisdiction over.
 | Metric | Score | Notes |
 |---|---|---|
 | Faithfulness | see grounding above | measured against cited spans, plus the symbol oracle |
-| Answer relevance | **1.00** | every answer addressed its question |
-| Context relevance | **0.55** | share of retrieved spans that were actually useful |
+| Answer relevance | **0.98** | almost every answer addressed its question |
+| Context relevance | **0.59** | share of retrieved spans that were actually useful |
 
-33 answers, run 5, $0.82. Fully relevant context on only 4 of 33 questions.
+52 answers, run 9, $1.36. Fully relevant context on only 7 of 52 questions.
 
 **Answer relevance is 1.00 because honest non-answers count as relevant.** An
 answer correctly reporting that the documentation does not cover something has
@@ -405,10 +416,10 @@ addressed the question. Scoring that as irrelevant would reward guessing, which
 is the opposite of what the abstention policy is for, so the rubric says so
 explicitly.
 
-**Context relevance of 0.55 is the actionable number, and it corroborates an
-earlier finding by a different route.** Generation showed 23% of supplied spans
+**Context relevance of 0.59 is the actionable number, and it corroborates an
+earlier finding by a different route.** Generation showed 22% of supplied spans
 were never cited. The triad, judging span usefulness independently and without
-seeing which were cited, puts 45% of spans as not useful. Two unrelated
+seeing which were cited, puts 41% of spans as not useful. Two unrelated
 measurements agreeing that `rerank_top_n` of 5 is larger than answers need is
 much stronger evidence than either alone. Every surplus span is paid for in
 input tokens on every query.
