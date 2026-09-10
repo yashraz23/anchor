@@ -424,25 +424,44 @@ measurements agreeing that `rerank_top_n` of 5 is larger than answers need is
 much stronger evidence than either alone. Every surplus span is paid for in
 input tokens on every query.
 
-**On ragas.** The triad above is computed in
+**On ragas, and why the two disagree.** The triad above is computed in
 [`triad.py`](src/anchor/evaluate/triad.py) rather than by ragas, because ragas
 requires LangChain, which was out of bounds when it was written. LangChain was
-later permitted, so ragas is now wired up as a *cross-check* rather than a
+later permitted, so ragas is wired up as a *cross-check* rather than a
 replacement: an in-house metric nobody has calibrated is a number without a
-reference class, and running the standard implementation over the same answers
-says how far the two land apart.
+reference class. `uv run anchor ragas` drives it with Claude rather than OpenAI,
+so a disagreement is about the metric and not about which model judged.
 
-`uv run anchor ragas` drives ragas with Claude rather than OpenAI, so a
-disagreement is about the metric and not about which model judged. Two things
-were needed to make it run, both recorded because they are the maintenance cost
-of the dependency: ragas 0.4.3 still imports
-`langchain_community.chat_models.vertexai`, removed in langchain-community 0.4,
-so that is pinned below 0.4; and Opus 5 rejects `temperature` outright, while
-LangChain sends one by default and ragas overwrites it per call, so both are
-suppressed.
+The comparison is **partial**: ragas exhausted the API budget after 15 of 33
+samples on run 5, and again after ~17 of 52 on run 9. What it did produce is
+worth reporting, because the two metrics disagree sharply and the reason is
+instructive.
 
-The comparison itself has not been run: the API credit balance ran out first.
-The numbers will go here when it is.
+| Metric | This repo | ragas | Same thing? |
+|---|---|---|---|
+| Faithfulness | 1 unsupported claim in 496 | 0.94 | roughly agrees |
+| Answer relevance | 0.98 | **0.57** | **no** |
+| Context | 0.59 (relevance) | 0.88 (precision) | **no** |
+
+The answer-relevance gap is not noise, it is a definitional difference. This
+repo's rubric says explicitly that an honest "the documentation does not cover
+this" is relevant, because it answered the question and penalising it would
+reward guessing. Ragas's `AnswerRelevancy` generates questions from the answer
+and measures their similarity to the original; a non-answer generates nothing
+resembling the question and scores near zero. Both metrics are internally
+consistent. They measure different things and share a name.
+
+Context relevance and context precision differ the same way: one is the share of
+retrieved spans that were useful, the other is a rank-weighted precision. The
+lesson is not that one is wrong, it is that quoting a framework's number without
+its definition is how a results table ends up meaning nothing.
+
+**Ragas is roughly 5x more expensive per sample.** The triad cost $1.36 for 52
+answers, about $0.026 each. Ragas consumed the remaining ~$2.22 across roughly
+17 samples, about $0.13 each. That figure is inferred from the budget rather
+than metered per call, so treat it as an order of magnitude, not a measurement.
+The cause is structural: `AnswerRelevancy` alone makes several generation calls
+per sample, where the triad scores answer relevance and every span in one.
 
 ### Verifier agreement
 
