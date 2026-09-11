@@ -1,0 +1,94 @@
+# Phase 3 results
+
+Measured on a Windows 11 laptop, RTX 5070 Ti Laptop (12 GB), Docker Desktop
+WSL2 backend, mains power.
+
+## What runs, and what does not
+
+| | |
+|---|---|
+| k3s cluster (k3d) with NVIDIA runtime | **works** — node resolves the GPU, containerd has the `nvidia` runtime |
+| GPU **inside a pod** | **blocked** — see below |
+| vLLM on the GPU in plain Docker | **works** |
+| Quantized model served, load tested | **works** — numbers below |
+
+### Why the GPU cannot reach a pod here
+
+Two independent blocks, both specific to nesting containers under WSL2:
+
+1. **The NVIDIA device plugin cannot start.** It needs NVML to enumerate
+   devices; NVML returns `Not Supported` inside a pod nested in a k3d node. The
+   same call succeeds one level up in `docker run --gpus all`.
+2. **Manual device passthrough is refused by the OS.** Staging the driver
+   libraries into the pod and mounting `/dev/dxg` gets as far as
+   `Failed to initialize NVML: GPU access blocked by the operating system`.
+
+Both are artefacts of running Kubernetes inside Docker inside WSL2. On
+bare-metal Linux the device plugin is the normal, supported path and none of
+this applies. The manifests in `k3s/` are written for that case.
+
+## Serving numbers
+
+`Qwen/Qwen2.5-3B-Instruct-AWQ`, 4-bit AWQ, 4096 context, `max_num_seqs=32`,
+`gpu_memory_utilization=0.55`, eager mode.
+
+| Measure | Value |
+|---|---|
+| VRAM occupied | 7,104 MiB of 12,227 MiB |
+| KV cache | 126,928 tokens |
+| Max concurrency at 4k context | 30.99× |
+| Time to ready | ~225 s (first load, weights cached after) |
+
+Load generated with k6 at a constant arrival rate. Arrival rate rather than a
+fixed pool of virtual users: a VU loop measures how fast the server drains a
+queue it set itself, which flatters a slow server.
+
+| Offered rate | Achieved | P95 | P99 | Failures |
+|---|---|---|---|---|
+| 6 /s | 5.70 /s | 2.68 s | — | 0 of 360 |
+| 12 /s | 11.35 /s | 2.70 s | **2.74 s** | 0 of 720 |
+| 20 /s | **12.57 /s** | — | — | 0 |
+
+**Sustained throughput is about 12.5 requests per second — roughly 750 RPM — at
+a P99 of 2.74 s.** Offering 20/s yields the same ~12.5/s, which is what
+saturation looks like: the server holds its latency and stops accepting more
+work rather than degrading. Zero failures at every rate.
+
+GPU utilisation sat at 18% at 59.8 W during the run, well under the 125 W
+limit, so the bottleneck at this size is scheduling overhead rather than
+compute.
+
+## The quantization delta is not measured
+
+The spec asks for a memory and throughput delta between quantized and
+unquantized. That needs the same model served both ways, and it is **not
+reported here** because the disk filled before the bf16 weights finished
+downloading: `Qwen2.5-3B-Instruct` in bf16 is ~6.2 GB and 3.3 GB was free.
+
+Not estimated, not inferred from the AWQ figures. To complete it, free roughly
+8 GB and:
+
+```bash
+docker run -d --name vllm-bf16 --gpus all -p 8000:8000 \
+  -e VLLM_WSL2_ENABLE_PIN_MEMORY=1 \
+  -v "$HOME/.cache/huggingface:/root/.cache/huggingface" --shm-size=2g \
+  vllm/vllm-openai:latest Qwen/Qwen2.5-3B-Instruct \
+  --served-model-name anchor-generator --max-model-len 4096 \
+  --gpu-memory-utilization 0.85 --max-num-seqs 32 --enforce-eager
+
+k6 run --summary-trend-stats="avg,med,p(95),p(99),max" deploy/load/serve.js
+```
+
+## The one setting that made vLLM work at all
+
+vLLM fails on WSL2 with `RuntimeError: UVA is not available`. The cause is not
+a missing capability: `is_uva_available()` reduces to `is_pin_memory_available()`,
+and on WSL2 vLLM disables pinned memory *by default* even on kernels that
+support it. This kernel is 6.6.87.2, well past the 4.19.121 gate.
+
+```bash
+-e VLLM_WSL2_ENABLE_PIN_MEMORY=1
+```
+
+That is a supported vLLM environment variable, not a patch. Without it vLLM
+cannot start on WSL2 at all.
