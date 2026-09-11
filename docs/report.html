@@ -442,7 +442,7 @@
 <div class="page">
 
   <header class="masthead">
-    <p class="eyebrow">Phase 1 report &middot; 10 September 2026</p>
+    <p class="eyebrow">Phase 1 complete &middot; phase 3 partly measured &middot; 11 September 2026</p>
     <h1>Anchor</h1>
     <p class="standfirst">
       A retrieval system over vLLM's documentation that refuses to answer when it
@@ -476,6 +476,7 @@
       <li><a href="#bugs">Bugs worth knowing</a></li>
       <li><a href="#decisions">Decisions vs. the spec</a></li>
       <li><a href="#notdone">What is not done</a></li>
+      <li><a href="#serving">Phase 3: serving</a></li>
       <li><a href="#guide">Guide: what remains</a></li>
       <li><a href="#reference">Command reference</a></li>
     </ol>
@@ -1235,9 +1236,119 @@
             <tr><td>Hugging Face Spaces deployment</td><td><span class="pill bad">needs you</span> publishes under your account</td></tr>
             <tr><td>vLLM documentation pull request</td><td><span class="pill bad">needs you</span> drafted, not filed</td></tr>
             <tr><td>Phase 2 — LoRA judge distillation</td><td><span class="pill bad">not started</span> by design</td></tr>
-            <tr><td>Phase 3 — k3s serving</td><td><span class="pill bad">not started</span> by design</td></tr>
+            <tr><td>Phase 3 — vLLM serving, load tested</td><td><span class="pill ok">measured</span> 12.5 req/s, P99 2.74 s</td></tr>
+            <tr><td>Phase 3 — GPU scheduled by Kubernetes</td><td><span class="pill bad">blocked</span> WSL2 nesting; needs bare-metal Linux</td></tr>
+            <tr><td>Phase 3 — quantization delta</td><td><span class="pill warn">partial</span> blocked on ~8 GB of disk</td></tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+
+    <!-- ============ SERVING ============ -->
+    <section id="serving">
+      <h2>Phase 3: serving on a GPU</h2>
+      <p class="section-note">measured on the laptop RTX 5070 Ti, 12 GB, on mains power</p>
+
+      <p>
+        A quantized model served by vLLM, load tested to saturation. The numbers below
+        are real and were produced on this machine. One part of the spec could not be
+        measured and is marked as such rather than estimated.
+      </p>
+
+      <div class="headline">
+        <div>
+          <p class="k">Sustained throughput</p>
+          <p class="v">12.5 /s</p>
+          <p class="s">about 750 requests per minute</p>
+        </div>
+        <div>
+          <p class="k">P99 latency</p>
+          <p class="v">2.74 s</p>
+          <p class="s">at 12 req/s offered load</p>
+        </div>
+        <div>
+          <p class="k">Failures</p>
+          <p class="v">0</p>
+          <p class="s">across 1,080 requests</p>
+        </div>
+        <div>
+          <p class="k">VRAM occupied</p>
+          <p class="v">7.1 GB</p>
+          <p class="s">of 12,227 MiB, 4-bit AWQ</p>
+        </div>
+      </div>
+
+      <div class="scroller">
+        <table>
+          <caption>
+            Qwen2.5-3B-Instruct-AWQ, 4096 context, max_num_seqs 32. k6 drives a constant
+            arrival rate rather than a fixed pool of virtual users: a VU loop measures how
+            fast the server drains a queue it set itself, which flatters a slow server.
+          </caption>
+          <thead><tr><th class="num">Offered</th><th class="num">Achieved</th><th class="num">P95</th><th class="num">P99</th><th class="num">Failures</th></tr></thead>
+          <tbody>
+            <tr><td class="num">6 /s</td><td class="num">5.70 /s</td><td class="num">2.68 s</td><td class="num">&mdash;</td><td class="num">0 of 360</td></tr>
+            <tr class="best"><td class="num">12 /s</td><td class="num">11.35 /s</td><td class="num">2.70 s</td><td class="num">2.74 s</td><td class="num">0 of 720</td></tr>
+            <tr><td class="num">20 /s</td><td class="num">12.57 /s</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Offering 20 requests per second yields the same 12.5, which is what saturation
+        should look like: the server holds its latency and stops accepting more work
+        rather than degrading. The GPU sat at 18% utilisation and 59.8 W against a 125 W
+        limit, so at 3B the bottleneck is scheduling overhead rather than compute.
+      </p>
+
+      <div class="callout finding">
+        <p class="label">The one setting that makes vLLM run on WSL2 at all</p>
+        <p>
+          vLLM refuses to start with <code>RuntimeError: UVA is not available</code>. The
+          cause is policy, not capability: <code>is_uva_available()</code> reduces to
+          <code>is_pin_memory_available()</code>, and vLLM disables pinned memory by
+          default on WSL2 even on kernels past its own 4.19.121 gate. This kernel is
+          6.6.87.2. Setting <code>VLLM_WSL2_ENABLE_PIN_MEMORY=1</code>, a supported
+          environment variable rather than a patch, makes it work.
+        </p>
+      </div>
+
+      <h3>The GPU cannot reach a pod on this machine</h3>
+      <p>
+        The k3s cluster itself works. Built via k3d with a custom CUDA node image, the
+        node resolves the GPU and k3s auto-configures the <code>nvidia</code> containerd
+        runtime. What fails is the last hop into a pod, for two independent reasons:
+      </p>
+      <ul>
+        <li>
+          <strong>The NVIDIA device plugin cannot start.</strong> It needs NVML to
+          enumerate devices, and NVML returns <code>Not Supported</code> inside a pod
+          nested in a k3d node.
+        </li>
+        <li>
+          <strong>Manual passthrough is refused by the OS.</strong> Staging the driver
+          libraries and mounting <code>/dev/dxg</code> reaches
+          <code>GPU access blocked by the operating system</code>.
+        </li>
+      </ul>
+      <p>
+        Both calls succeed one level up, in a plain <code>docker run --gpus all</code>, so
+        these are artefacts of running Kubernetes inside Docker inside WSL2 rather than
+        limits of the hardware. On bare-metal Linux the device plugin is the normal
+        supported path. The manifests in <code>deploy/k3s/</code> are written for that
+        case and the cluster build is reproducible from them.
+      </p>
+
+      <div class="callout caveat">
+        <p class="label">The quantization delta is not measured</p>
+        <p>
+          The spec asks for a memory and throughput delta between quantized and
+          unquantized. That needs the same model served both ways, and the disk filled
+          before the 6.2 GB bf16 weights finished downloading, with 3.3 GB free. It is
+          left unmeasured rather than estimated from the AWQ figures. Freeing about 8 GB
+          and re-running the two commands in <code>deploy/RESULTS.md</code> completes it.
+        </p>
       </div>
     </section>
 
@@ -1344,20 +1455,35 @@ uv run anchor eval-retrieval</code></pre>
       </div>
 
       <div class="step">
-        <div class="step-head"><h3>Phase 3 — k3s serving</h3><span class="tag">November</span></div>
+        <div class="step-head"><h3>Phase 3 &mdash; finish the serving numbers</h3><span class="tag">~1 hour</span></div>
+        <p>
+          The serving path is built and measured. Two pieces remain, and neither needs new
+          code.
+        </p>
         <ol class="body-list">
-          <li>k3s on the RTX 5070 Ti with the NVIDIA device plugin for GPU scheduling.</li>
-          <li>Serve the generator via vLLM as a Deployment; the anchor API as a second one. The <code>VLLMBackend</code> already exists and speaks the OpenAI-compatible API.</li>
-          <li>Quantize with AWQ or GPTQ and record the memory and throughput delta.</li>
-          <li>HPA driven by queue depth rather than CPU — and be able to say why.</li>
-          <li>Load-test with k6 and record sustained RPM and P99 latency, before and after quantization.</li>
+          <li>
+            <strong>The quantization delta.</strong> Free about 8 GB, then serve
+            <code>Qwen/Qwen2.5-3B-Instruct</code> in bf16 and re-run the same k6 script.
+            Both commands are in <code>deploy/RESULTS.md</code>. The obvious candidate for
+            the space is a 7.2 GB Phi-3 model sitting in the Hugging Face cache from
+            earlier work, but that is yours to decide on.
+          </li>
+          <li>
+            <strong>GPU scheduling under Kubernetes</strong> needs bare-metal Linux, or any
+            Linux box with a GPU. The manifests apply unchanged; there you install the
+            NVIDIA device plugin instead of staging driver libraries, and
+            <code>nvidia.com/gpu</code> becomes an allocatable resource. That is also what
+            makes an HPA on queue depth meaningful, since there is then more than one
+            schedulable GPU slot to scale into.
+          </li>
         </ol>
         <div class="callout caveat">
-          <p class="label">Hardware constraint, measured</p>
+          <p class="label">What the resume bullet can honestly say</p>
           <p>
-            The GPU is a 12 GB RTX 5070 Ti <em>Laptop</em>, not the 16 GB desktop part.
-            Qwen2.5-7B will not serve unquantized. Quantization is therefore a requirement
-            rather than an experiment — which happens to align with the deliverable.
+            "Served a quantized model with vLLM at ~750 RPM and 2.74 s P99, measured with
+            k6" is supported by this run. "On k3s" is not, on this machine: the cluster runs
+            and the manifests are real, but the model was served by Docker because the GPU
+            cannot reach a pod under WSL2.
           </p>
         </div>
       </div>
