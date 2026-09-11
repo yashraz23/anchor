@@ -1,0 +1,40 @@
+# GPU access for pods, without the device plugin.
+#
+# The NVIDIA k8s device plugin cannot run here: it needs NVML to enumerate
+# devices, and NVML fails with "Not Supported" inside a pod nested in a k3d
+# node under WSL2. NVML works one level up, in a plain `docker run --gpus all`,
+# so this is a nesting limitation rather than a WSL2-wide one.
+#
+# Instead each GPU pod copies the driver libraries off the node into an
+# emptyDir and puts that on LD_LIBRARY_PATH. Copying rather than mounting the
+# node's /usr/lib/x86_64-linux-gnu wholesale matters: that directory also holds
+# the node's glibc, and putting it ahead of the container's own libraries
+# breaks anything compiled against a different one.
+#
+# The consequence to be honest about: Kubernetes does not know a GPU exists.
+# `nvidia.com/gpu` is not an allocatable resource, so the scheduler cannot
+# place pods by GPU or stop two of them contending for the same card. On a
+# single-GPU node that is tolerable; on a real cluster it would not be.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-lib-copy
+  namespace: anchor
+data:
+  copy.sh: |
+    set -eu
+    mkdir -p /nvidia/lib64
+    # The WSL driver directory carries a version hash, so glob it.
+    for d in /host/usr/lib/wsl/drivers/*/; do
+      cp -f "$d"lib*.so* /nvidia/lib64/ 2>/dev/null || true
+    done
+    # Everything the CUDA loader needs that the WSL dir does not carry.
+    for lib in libcuda libnvidia-ml libnvidia-ptxjitcompiler libnvdxgdmal; do
+      cp -f /host/usr/lib/x86_64-linux-gnu/"$lib"*.so* /nvidia/lib64/ 2>/dev/null || true
+    done
+    # vLLM dlopens libcuda.so.1; WSL ships libcuda.so.1.1.
+    if [ ! -e /nvidia/lib64/libcuda.so.1 ] && [ -e /nvidia/lib64/libcuda.so.1.1 ]; then
+      ln -sf libcuda.so.1.1 /nvidia/lib64/libcuda.so.1
+    fi
+    cp -f /host/usr/bin/nvidia-smi /nvidia/ 2>/dev/null || true
+    echo "staged $(ls /nvidia/lib64 | wc -l) driver libraries"

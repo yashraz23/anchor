@@ -1,0 +1,99 @@
+# vLLM serving a quantized model, as a Deployment.
+#
+# Model choice is forced by the hardware: this is a 12 GB laptop RTX 5070 Ti.
+# Qwen2.5-7B in bf16 is ~15 GB and does not fit, so a quantization *delta*
+# cannot be measured at 7B on this card. The 3B pair fits both ways, which is
+# what makes the before-and-after comparison possible at all.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache
+  namespace: anchor
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: anchor
+  labels: { app: vllm }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vllm }
+  template:
+    metadata:
+      labels: { app: vllm }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+      - name: stage-drivers
+        image: busybox:1.36
+        command: ["sh", "/scripts/copy.sh"]
+        volumeMounts:
+        - { name: scripts, mountPath: /scripts }
+        - { name: nvidia,  mountPath: /nvidia }
+        - { name: hostusr, mountPath: /host/usr, readOnly: true }
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        args:
+          - --model=$(MODEL)
+          - --served-model-name=anchor-generator
+          - --max-model-len=4096
+          - --gpu-memory-utilization=0.85
+          - --max-num-seqs=$(MAX_NUM_SEQS)
+          - --disable-log-requests
+        env:
+        - { name: MODEL,         value: "Qwen/Qwen2.5-3B-Instruct-AWQ" }
+        - { name: MAX_NUM_SEQS,  value: "64" }
+        - { name: LD_LIBRARY_PATH, value: "/nvidia/lib64" }
+        - { name: HF_HOME,       value: "/models" }
+        # vLLM probes the driver before CUDA init; without this it reports no
+        # GPU and falls back to a CPU path that never finishes loading.
+        - { name: NVIDIA_VISIBLE_DEVICES, value: "all" }
+        - { name: NVIDIA_DRIVER_CAPABILITIES, value: "compute,utility" }
+        ports:
+        - { name: http, containerPort: 8000 }
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - { name: nvidia, mountPath: /nvidia }
+        - { name: dxg,    mountPath: /dev/dxg }
+        - { name: models, mountPath: /models }
+        - { name: shm,    mountPath: /dev/shm }
+        readinessProbe:
+          httpGet: { path: /health, port: http }
+          initialDelaySeconds: 45
+          periodSeconds: 10
+          failureThreshold: 60
+        livenessProbe:
+          httpGet: { path: /health, port: http }
+          initialDelaySeconds: 300
+          periodSeconds: 30
+      volumes:
+      - { name: scripts, configMap: { name: nvidia-lib-copy } }
+      - { name: nvidia,  emptyDir: {} }
+      - { name: hostusr, hostPath: { path: /usr } }
+      - { name: dxg,     hostPath: { path: /dev/dxg, type: CharDevice } }
+      - { name: models,  persistentVolumeClaim: { claimName: model-cache } }
+      # vLLM needs a large /dev/shm for its worker IPC; the 64 MB default
+      # causes a silent hang on startup rather than an error.
+      - { name: shm, emptyDir: { medium: Memory, sizeLimit: 2Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: anchor
+spec:
+  selector: { app: vllm }
+  ports:
+  - { name: http, port: 8000, targetPort: http }

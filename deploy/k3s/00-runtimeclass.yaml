@@ -1,0 +1,8 @@
+# k3s auto-detects nvidia-container-runtime on the node and writes a containerd
+# runtime entry named "nvidia". A RuntimeClass is what lets a pod ask for it;
+# without this the device plugin runs under runc and sees no GPU.
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+handler: nvidia
