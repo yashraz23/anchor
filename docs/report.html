@@ -442,7 +442,7 @@
 <div class="page">
 
   <header class="masthead">
-    <p class="eyebrow">Phase 1 complete &middot; phase 3 partly measured &middot; 11 September 2026</p>
+    <p class="eyebrow">Phase 1 complete &middot; phase 3 partly measured &middot; 12 September 2026</p>
     <h1>Anchor</h1>
     <p class="standfirst">
       A retrieval system over vLLM's documentation that refuses to answer when it
@@ -452,10 +452,10 @@
       and how often it answers at all.
     </p>
     <div class="meta-row">
-      <span><b>23</b> commits</span>
-      <span><b>294</b> tests passing</span>
-      <span><b>6,632</b> lines of source</span>
-      <span><b>3,106</b> lines of tests</span>
+      <span><b>28</b> commits</span>
+      <span><b>305</b> tests passing</span>
+      <span><b>7,187</b> lines of source</span>
+      <span><b>3,317</b> lines of tests</span>
       <span>corpus pinned at <b>v0.28.1rc0</b> / <b>65f3fca5</b></span>
     </div>
   </header>
@@ -475,6 +475,7 @@
       <li><a href="#triad">Triad &amp; ragas</a></li>
       <li><a href="#bugs">Bugs worth knowing</a></li>
       <li><a href="#decisions">Decisions vs. the spec</a></li>
+      <li><a href="#stack">Stack audit</a></li>
       <li><a href="#notdone">What is not done</a></li>
       <li><a href="#serving">Phase 3: serving</a></li>
       <li><a href="#guide">Guide: what remains</a></li>
@@ -1225,6 +1226,97 @@
     </section>
 
     <!-- ============ NOT DONE ============ -->
+    <!-- ============ STACK AUDIT ============ -->
+    <section id="stack">
+      <h2>Stack audit</h2>
+      <p class="section-note">every technology the spec named, and whether it is actually load-bearing</p>
+
+      <p>
+        The spec opened with a table of technologies. Declaring one and then not
+        using it is the easiest way for a project like this to overstate itself, so
+        each is listed here against what it actually does in the code. Three had to
+        be fixed before this table could be written.
+      </p>
+
+      <div class="callout caveat">
+        <p class="label">What the audit found</p>
+        <p>
+          Weights &amp; Biases and Langfuse were named in the spec, given settings in
+          <code>config.py</code>, listed as dependencies &mdash; and never called. That
+          is worse than an honest omission: the configuration read as though the
+          integration existed. Autoscaling was in the same position with no manifest at
+          all. All three are now real, and the two that remain unverified say so below.
+        </p>
+      </div>
+
+      <div class="scroller">
+        <table>
+          <caption>
+            &ldquo;Load-bearing&rdquo; means a published number would change or a
+            documented workflow would break without it.
+          </caption>
+          <thead><tr><th>Technology</th><th>Status</th><th>What it actually does here</th></tr></thead>
+          <tbody>
+            <tr><td>Python 3.11, uv</td><td><span class="pill ok">load-bearing</span></td><td>Pinned interpreter and lockfile; CI resolves from <code>uv.lock</code>.</td></tr>
+            <tr><td>Postgres 16 + pgvector</td><td><span class="pill ok">load-bearing</span></td><td>HNSW cosine index over 12,610 chunks.</td></tr>
+            <tr><td>Postgres full-text search</td><td><span class="pill ok">load-bearing</span></td><td>The sparse leg of hybrid retrieval; <code>ts_rank_cd</code> over generated <code>tsvector</code>.</td></tr>
+            <tr><td>bge-small-en-v1.5</td><td><span class="pill ok">load-bearing</span></td><td>Every embedding in the corpus, query-instruction prefix on the query side only.</td></tr>
+            <tr><td>bge-reranker-base</td><td><span class="pill ok">load-bearing</span></td><td>Cross-encoder rescoring; the largest single recall gain in the sweep.</td></tr>
+            <tr><td>Reciprocal rank fusion</td><td><span class="pill ok">load-bearing</span></td><td>Rank-only fusion of the dense and sparse legs, k = 60.</td></tr>
+            <tr><td>Claude API</td><td><span class="pill ok">load-bearing</span></td><td>Answer generation, the grounding judge, and the triad scorer.</td></tr>
+            <tr><td>FastAPI + Pydantic v2</td><td><span class="pill ok">load-bearing</span></td><td>The service; Pydantic also types every settings object and every structured judge output.</td></tr>
+            <tr><td>Gradio</td><td><span class="pill ok">load-bearing</span></td><td>The demo, showing spans and verdicts beside each answer.</td></tr>
+            <tr><td>Docker &amp; compose</td><td><span class="pill ok">load-bearing</span></td><td>Postgres, the API, the demo, and the vLLM server in phase 3.</td></tr>
+            <tr><td>GitHub Actions</td><td><span class="pill ok">load-bearing</span></td><td>Lint, types, 305 tests, and two real eval gates on a fixture corpus.</td></tr>
+            <tr><td>pytest, ruff, mypy</td><td><span class="pill ok">load-bearing</span></td><td>305 tests; both linters clean across 60 source files.</td></tr>
+            <tr><td>ragas</td><td><span class="pill ok">load-bearing</span></td><td>Cross-check on the hand-written triad, driven by Claude so the comparison is of metrics, not models.</td></tr>
+            <tr><td>vLLM</td><td><span class="pill ok">load-bearing</span></td><td>Serves a quantized model at 12.5 req/s in phase 3, and is also the subject of the corpus.</td></tr>
+            <tr><td>Weights &amp; Biases</td><td><span class="pill ok">wired</span></td><td>Both sweeps log to it: the recall grid, and the tradeoff curve with its two failure rates kept apart. Verified offline.</td></tr>
+            <tr><td>Langfuse</td><td><span class="pill warn">wired, unverified</span></td><td>All four model call sites publish a generation with tokens, latency and cost. No server has received one.</td></tr>
+            <tr><td>k3s</td><td><span class="pill warn">partial</span></td><td>Cluster builds and the manifests are real; the GPU cannot reach a pod under WSL2.</td></tr>
+            <tr><td>Horizontal pod autoscaling</td><td><span class="pill warn">written, unexercised</span></td><td>Scales on queue depth. Nothing to scale into on this machine.</td></tr>
+            <tr><td>vLLM as a generation backend</td><td><span class="pill warn">written, unexercised</span></td><td><code>VLLMBackend</code> implements the protocol but has never answered a golden question.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Why the two trackers behave differently without keys</h3>
+      <p>
+        Weights &amp; Biases falls back to a real offline run written under
+        <code>data/wandb/</code>, syncable later with <code>wandb sync</code>. Same
+        config, same tables, same summary &mdash; which is what makes the integration
+        checkable by a reader who has no account. Langfuse has no offline equivalent;
+        it is a server or nothing, so it disables itself rather than pretend to have
+        traced something. Neither is allowed to change a result or fail a run: every
+        entry point swallows its own exceptions, because a telemetry outage that kills
+        a paid evaluation would be a worse bug than the missing telemetry.
+      </p>
+
+      <div class="callout finding">
+        <p class="label">Two bugs that only surfaced by running it</p>
+        <p>
+          <code>wandb.init</code> silently discards a top-level <code>mode</code>
+          argument when a settings object is passed alongside it, so the offline
+          fallback failed asking for an API key &mdash; precisely the case it exists to
+          handle. Underneath that sat a second one: an empty credential is not an absent
+          credential. The <code>.env</code> carried a bare <code>WANDB_API_KEY=</code>,
+          which parses as an empty secret and passes an <em>is not None</em> check, so
+          the tracker took the authenticated path with no key. Blank secrets are now
+          normalised to absent for all four keys, which is also how compose passes an
+          unset variable through.
+        </p>
+      </div>
+
+      <p>
+        One structural fix came with them. The tracker switches were fields on the
+        evaluation settings, which put them inside the configuration dict written to
+        every run row. Two runs differing only in whether a tracker was watching are the
+        same experiment, and recording them as different configurations would defeat the
+        single job that dict has. They now live in their own section, excluded from it.
+      </p>
+    </section>
+
+
     <section id="notdone">
       <h2>What is not done</h2>
       <p class="section-note">stated plainly rather than left for a reader to discover</p>
@@ -1240,6 +1332,10 @@
             <tr><td>ragas cross-check</td><td><span class="pill warn">partial</span> ~17 of 52 samples</td></tr>
             <tr><td>Hugging Face Spaces deployment</td><td><span class="pill bad">needs you</span> publishes under your account</td></tr>
             <tr><td>vLLM documentation pull request</td><td><span class="pill bad">needs you</span> drafted, not filed</td></tr>
+            <tr><td>Langfuse traces confirmed by a server</td><td><span class="pill bad">needs you</span> the payload is tested against a stub, not an instance</td></tr>
+            <tr><td>Weights &amp; Biases runs synced to the cloud</td><td><span class="pill warn">partial</span> logged offline; <code>wandb sync</code> once an account exists</td></tr>
+            <tr><td>Autoscaling on queue depth</td><td><span class="pill warn">written</span> unexercised; no schedulable GPU slot under WSL2</td></tr>
+            <tr><td><code>VLLMBackend</code> answering golden questions</td><td><span class="pill warn">written</span> the serving path was measured, this backend was not</td></tr>
             <tr><td>Phase 2 — LoRA judge distillation</td><td><span class="pill bad">not started</span> by design</td></tr>
             <tr><td>Phase 3 — vLLM serving, load tested</td><td><span class="pill ok">measured</span> 12.5 req/s, P99 2.74 s</td></tr>
             <tr><td>Phase 3 — GPU scheduled by Kubernetes</td><td><span class="pill bad">blocked</span> WSL2 nesting; needs bare-metal Linux</td></tr>
