@@ -1,0 +1,67 @@
+# Horizontal autoscaling on queue depth.
+#
+# NOT EXERCISED ON THIS MACHINE. Like the rest of deploy/k3s, this is written
+# for bare-metal Linux. Under WSL2 the GPU cannot reach a pod at all (see
+# deploy/RESULTS.md), so there is never more than zero schedulable GPU slots and
+# an autoscaler has nothing to scale into. It is committed unmeasured and
+# labelled as such rather than presented as a result.
+#
+# Why queue depth and not CPU or GPU utilisation:
+#
+# CPU is meaningless here — the process is waiting on the GPU, not the core.
+# GPU utilisation is closer but still wrong, because it saturates long before
+# the server is in trouble: the phase 3 load test held 12.5 req/s at 18% GPU
+# utilisation, so a utilisation trigger would never have fired even at
+# saturation. What actually degrades a user's latency is time spent waiting to
+# be scheduled, and vLLM publishes that directly as vllm:num_requests_waiting.
+# Scaling on the queue means adding a replica exactly when requests start
+# queueing, which is the thing the user feels.
+#
+# Requires kube-prometheus-stack and prometheus-adapter, with a rule mapping
+# vllm:num_requests_waiting into the external metrics API. The adapter rule
+# belongs with the monitoring install rather than here; the pod annotations that
+# get the metric scraped are already on the Deployment in 20-vllm.yaml.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vllm
+  namespace: anchor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vllm
+  minReplicas: 1
+  # One replica per GPU. A second replica on a single-GPU node would sit
+  # Pending forever and the HPA would read that as "scaling did not help",
+  # so this ceiling is a property of the node, not a preference.
+  maxReplicas: 4
+  metrics:
+  - type: External
+    external:
+      metric:
+        name: vllm_num_requests_waiting
+        selector:
+          matchLabels: { app: vllm }
+      target:
+        # Averaged across replicas. Two waiting per replica tolerates the
+        # normal burstiness of a constant arrival rate without flapping; zero
+        # would add a replica for a single queued request.
+        type: AverageValue
+        averageValue: "2"
+  behavior:
+    scaleUp:
+      # A vLLM pod takes 45 s to become ready on a warm model cache and several
+      # minutes on a cold one. Reacting fast to a spike buys nothing when the
+      # new replica cannot serve for a minute, but a short window still beats a
+      # long one for a sustained climb.
+      stabilizationWindowSeconds: 60
+      policies:
+      - { type: Pods, value: 1, periodSeconds: 120 }
+    scaleDown:
+      # Deliberately slow. Killing a replica drops its KV cache and its
+      # in-flight requests, and re-warming costs more than the idle GPU-minute
+      # saved by scaling down early.
+      stabilizationWindowSeconds: 600
+      policies:
+      - { type: Pods, value: 1, periodSeconds: 300 }

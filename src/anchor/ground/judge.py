@@ -20,6 +20,7 @@ byproduct of work already done.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
@@ -28,6 +29,7 @@ from pydantic import BaseModel, Field
 from anchor.config import Settings, Verdict, cost_usd
 from anchor.ground.claims import Claim
 from anchor.retrieve.search import Hit
+from anchor.track import record_generation
 
 logger = logging.getLogger(__name__)
 
@@ -130,13 +132,16 @@ class AnthropicJudge:
         if not claims:
             return JudgeResult(verdicts={}, reasons={})
 
+        prompt = build_judge_prompt(claims, spans)
+        started = time.perf_counter()
         response = self._client.messages.parse(
             model=self.settings.ground.judge_model,
             max_tokens=self.settings.generate.max_tokens,
             system=JUDGE_SYSTEM,
-            messages=[{"role": "user", "content": build_judge_prompt(claims, spans)}],
+            messages=[{"role": "user", "content": prompt}],
             output_format=JudgeResponse,
         )
+        latency_ms = int((time.perf_counter() - started) * 1000)
         parsed = response.parsed_output
         verdicts: dict[int, Verdict] = {}
         reasons: dict[int, str] = {}
@@ -145,12 +150,29 @@ class AnthropicJudge:
                 verdicts[judgement.ordinal] = Verdict(judgement.verdict)
                 reasons[judgement.ordinal] = judgement.reason
 
-        return JudgeResult(
+        result = JudgeResult(
             verdicts=verdicts,
             reasons=reasons,
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
         )
+        # Judge calls are traced alongside answer calls on purpose. The judge is
+        # the most expensive model in the project and the one whose behaviour is
+        # hardest to argue about from a summary statistic; its prompts are worth
+        # being able to read one by one.
+        record_generation(
+            self.settings,
+            name="judge",
+            model=self.settings.ground.judge_model,
+            prompt=prompt,
+            output=repr(parsed) if parsed is not None else "",
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            latency_ms=latency_ms,
+            cost_usd=judge_cost(result, self.settings.ground.judge_model),
+            metadata={"claims": len(claims), "spans": len(spans)},
+        )
+        return result
 
 
 def judge_cost(result: JudgeResult, model: str) -> float | None:

@@ -119,7 +119,7 @@ requires-dist = [
     { name = "langchain-anthropic", marker = "extra == 'eval'", specifier = ">=0.3" },
     { name = "langchain-community", marker = "extra == 'eval'", specifier = "<0.4" },
     { name = "langchain-huggingface", marker = "extra == 'eval'", specifier = ">=0.1" },
-    { name = "langfuse", marker = "extra == 'eval'", specifier = ">=2.53" },
+    { name = "langfuse", marker = "extra == 'eval'", specifier = ">=4.0" },
     { name = "markdown-it-py", specifier = ">=3.0" },
     { name = "matplotlib", marker = "extra == 'eval'", specifier = ">=3.9" },
     { name = "pandas", marker = "extra == 'eval'", specifier = ">=2.2" },

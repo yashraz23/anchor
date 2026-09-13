@@ -108,8 +108,53 @@ def run_retrieval_sweep(settings: Settings) -> SweepReport:
         ],
     }
     run_id = _record_run(settings, summary)
+    _track(settings, run_id, results, ks, len(queries))
 
     return SweepReport(run_id=run_id, git_sha=db.git_sha(), queries=len(queries), results=results)
+
+
+def _track(
+    settings: Settings,
+    run_id: int,
+    results: list[ConfigOutcome],
+    ks: list[int],
+    queries: int,
+) -> None:
+    """Publish the recall grid to Weights & Biases.
+
+    The database row remains the record of truth; this exists so twelve cells
+    across several runs can be compared without writing a query. The run id is
+    logged with it, which is what ties a chart in the UI back to the row that
+    holds the configuration that produced it.
+    """
+    from anchor.track import experiment, log_metrics, log_table
+
+    with experiment(
+        settings, "retrieval-sweep", {"run_id": run_id, "git_sha": db.git_sha(), "queries": queries}
+    ) as run:
+        log_table(
+            run,
+            "recall_grid",
+            ["strategy", "mode", "rerank", *(f"recall@{k}" for k in ks), "never_found"],
+            [
+                [r.strategy, r.mode, r.rerank, *r.recall_row(ks), len(r.never_found())]
+                for r in results
+            ],
+        )
+        # The full-stack cell is the one the README quotes, so it is also what
+        # the run summary sorts on.
+        best = next(
+            (
+                r
+                for r in results
+                if r.mode == "hybrid" and r.rerank and r.strategy == "structure_aware"
+            ),
+            None,
+        )
+        if best is not None:
+            log_metrics(
+                run, {f"best/recall@{k}": v for k, v in zip(ks, best.recall_row(ks), strict=True)}
+            )
 
 
 def render_report(report: SweepReport, settings: Settings) -> str:

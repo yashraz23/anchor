@@ -46,7 +46,11 @@ eval = [
     "langchain-community<0.4",
     "langchain-huggingface>=0.1",
     "wandb>=0.18",
-    "langfuse>=2.53",
+    # Langfuse 4 is a different library from Langfuse 2: v2 built traces with
+    # langfuse.trace()/generation(), while v3 moved to OpenTelemetry and
+    # start_observation(). anchor/track/tracing.py is written against the
+    # latter, so a v2 resolve would import cleanly and fail at the first call.
+    "langfuse>=4.0",
     "pandas>=2.2",
     "matplotlib>=3.9",
 ]

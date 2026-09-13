@@ -240,4 +240,34 @@ def ground_run(
 
     thresholds = [round(i / 10, 2) for i in range(0, 11)]
     report.points = sweep(scored, thresholds, settings.ground.support_threshold)
+    _track(settings, report)
     return report
+
+
+def _track(settings: Settings, report: GroundReport) -> None:
+    """Publish the tradeoff curve to Weights & Biases.
+
+    This is the project's headline result, so it is the one thing that most
+    needs to be comparable across runs rather than read off a terminal once.
+    The curve is logged whole: every threshold, both failure rates kept apart.
+    """
+    from anchor.track import experiment, log_metrics
+    from anchor.track.experiment import log_tradeoff_curve
+
+    with experiment(settings, "grounding-sweep", {"answer_run_id": report.run_id}) as run:
+        log_tradeoff_curve(run, report.points)
+        log_metrics(
+            run,
+            {
+                "answers": report.answers,
+                "claims": report.claims,
+                "uncited_claims": report.uncited_claims,
+                "oracle_checked": report.oracle_checked,
+                "oracle_contradicted": report.oracle_contradicted,
+                "judged_claims": report.judged_claims,
+                "judge_cost_usd": report.judge_cost_usd,
+                "judge_agrees_with_similarity": report.agree,
+                "judge_stricter": report.judge_stricter,
+                "attribution_stricter": report.attribution_stricter,
+            },
+        )

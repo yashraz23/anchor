@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 # Anthropic SDK carries its own default, so this applies to the vLLM path only.
 _REQUEST_TIMEOUT_S = 300.0
 
+# Langfuse takes one prompt field, and the system prompt is most of what makes
+# a run reproducible. Both halves are sent, separated so a reader can tell where
+# the fixed instructions end and the retrieved spans begin.
+_PROMPT_SEPARATOR = "\n\n---\n\n"
+
 
 @dataclass(frozen=True)
 class Completion:
@@ -46,6 +51,29 @@ class Backend(Protocol):
     def complete(self, system: str, user: str) -> Completion: ...
 
 
+def _trace(settings: Settings, name: str, system: str, user: str, completion: Completion) -> None:
+    """Publish a finished call to Langfuse, if it is configured.
+
+    Both backends call this with the Completion they are about to return, so the
+    trace carries the same token counts and the same latency the database
+    stores rather than a second measurement of them.
+    """
+    from anchor.track import record_generation
+
+    record_generation(
+        settings,
+        name=name,
+        model=completion.model,
+        prompt=_PROMPT_SEPARATOR.join((system, user)),
+        output=completion.text,
+        input_tokens=completion.input_tokens,
+        output_tokens=completion.output_tokens,
+        latency_ms=completion.latency_ms,
+        cost_usd=completion.cost_usd,
+        metadata={"stop_reason": completion.stop_reason},
+    )
+
+
 class AnthropicBackend:
     """Claude via the official SDK."""
 
@@ -53,6 +81,7 @@ class AnthropicBackend:
         import anthropic
 
         self.cfg: GenerateSettings = settings.generate
+        self.settings = settings
         key = settings.anthropic_api_key
         # The SDK resolves credentials from the environment on its own, so an
         # unset key here is not an error: it may still find one.
@@ -81,7 +110,7 @@ class AnthropicBackend:
         # stop_reason has to be checked before reading content: a refusal
         # returns HTTP 200 with no usable text.
         text = "".join(block.text for block in response.content if block.type == "text")
-        return Completion(
+        completion = Completion(
             text=text,
             model=self.cfg.anthropic_model,
             input_tokens=response.usage.input_tokens,
@@ -89,6 +118,8 @@ class AnthropicBackend:
             latency_ms=latency_ms,
             stop_reason=response.stop_reason,
         )
+        _trace(self.settings, "answer", system, user, completion)
+        return completion
 
 
 class VLLMBackend:
@@ -101,6 +132,7 @@ class VLLMBackend:
 
     def __init__(self, settings: Settings) -> None:
         self.cfg = settings.generate
+        self.settings = settings
 
     def complete(self, system: str, user: str) -> Completion:
         import httpx
@@ -125,7 +157,7 @@ class VLLMBackend:
         latency_ms = int((time.perf_counter() - started) * 1000)
 
         usage = payload.get("usage", {})
-        return Completion(
+        completion = Completion(
             text=payload["choices"][0]["message"]["content"] or "",
             model=self.cfg.vllm_model,
             input_tokens=int(usage.get("prompt_tokens", 0)),
@@ -133,6 +165,8 @@ class VLLMBackend:
             latency_ms=latency_ms,
             stop_reason=payload["choices"][0].get("finish_reason"),
         )
+        _trace(self.settings, "answer", system, user, completion)
+        return completion
 
 
 def make_backend(settings: Settings) -> Backend:

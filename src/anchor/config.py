@@ -18,7 +18,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -223,11 +223,26 @@ class EvaluateSettings(BaseModel):
     run_ragas: bool = True
     ragas_model: str = "claude-opus-5"
 
+
+class TrackSettings(BaseModel):
+    """Telemetry switches, deliberately kept out of `run_config()`.
+
+    These were originally fields on EvaluateSettings, which put them inside the
+    reproducibility config written to `runs.config_json`. That was wrong: two
+    runs differing only in whether a tracker was watching are the same
+    experiment, and recording them as different configurations would make the
+    config hash useless for the one job it has. Nothing here can change an
+    answer, so nothing here belongs in that dict.
+
+    Both trackers are optional and behave differently without credentials.
+    Weights & Biases falls back to a real offline run under `data/wandb/`.
+    Langfuse has no offline mode and disables itself instead.
+    """
+
+    use_wandb: bool = True
     wandb_project: str = "anchor"
     wandb_entity: str = ""
-    # Both trackers are optional. The harness no-ops when keys are absent so
-    # that CI and offline runs work unchanged.
-    use_wandb: bool = True
+
     use_langfuse: bool = True
 
 
@@ -258,6 +273,28 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr | None = Field(default=None, alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str = Field(default="https://cloud.langfuse.com", alias="LANGFUSE_HOST")
 
+    @field_validator(
+        "anthropic_api_key",
+        "wandb_api_key",
+        "langfuse_public_key",
+        "langfuse_secret_key",
+        mode="after",
+    )
+    @classmethod
+    def _blank_secret_is_absent(cls, value: SecretStr | None) -> SecretStr | None:
+        """An empty credential means unset, not set-to-empty.
+
+        docker-compose passes `${WANDB_API_KEY:-}` through as an empty string
+        rather than omitting it, and a `.env` written by hand usually carries
+        bare `KEY=` lines for the credentials the author does not have. Without
+        this, SecretStr('') is truthy against a `is not None` check, so the
+        trackers took the authenticated path with no key and failed on a
+        credential error instead of falling back the way they were built to.
+        """
+        if value is not None and not value.get_secret_value().strip():
+            return None
+        return value
+
     model_cache_dir: Path = REPO_ROOT / "data" / "cache"
 
     ingest: IngestSettings = IngestSettings()
@@ -267,13 +304,16 @@ class Settings(BaseSettings):
     generate: GenerateSettings = GenerateSettings()
     ground: GroundSettings = GroundSettings()
     evaluate: EvaluateSettings = EvaluateSettings()
+    track: TrackSettings = TrackSettings()
     api: ApiSettings = ApiSettings()
 
     def run_config(self) -> dict[str, object]:
         """The exact dict written to runs.config_json.
 
-        Secrets are excluded. A result must be reproducible from this alone, so
-        anything that can change an answer belongs in one of the sections above.
+        Secrets are excluded, and so is `track`: telemetry cannot change an
+        answer, so recording it here would make two identical experiments look
+        like different configurations. A result must be reproducible from this
+        dict alone, so anything that *can* change an answer belongs in it.
         """
         return {
             "ingest": self.ingest.model_dump(mode="json"),

@@ -20,6 +20,7 @@ strictly than a generic judge could. This module supplies the other two legs.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Literal
 
@@ -27,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from anchor.config import Settings, cost_usd
 from anchor.retrieve.search import Hit
+from anchor.track import record_generation
 
 logger = logging.getLogger(__name__)
 
@@ -106,31 +108,48 @@ class TriadScorer:
         )
 
     def score(self, question: str, answer: str, spans: list[Hit]) -> TriadResult:
+        prompt = build_triad_prompt(question, answer, spans)
+        started = time.perf_counter()
         response = self._client.messages.parse(
             model=self.settings.evaluate.ragas_model,
             max_tokens=self.settings.generate.max_tokens,
             system=TRIAD_SYSTEM,
-            messages=[{"role": "user", "content": build_triad_prompt(question, answer, spans)}],
+            messages=[{"role": "user", "content": prompt}],
             output_format=TriadScores,
         )
+        latency_ms = int((time.perf_counter() - started) * 1000)
         parsed = response.parsed_output
         if parsed is None:
-            return TriadResult(
+            result = TriadResult(
                 answer_relevance=0.0,
                 relevant_spans=0,
                 total_spans=len(spans),
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
             )
+        else:
+            relevant = sum(1 for s in parsed.spans if s.relevant and 1 <= s.span <= len(spans))
+            result = TriadResult(
+                answer_relevance=float(parsed.answer_relevance),
+                relevant_spans=relevant,
+                total_spans=len(spans),
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+            )
 
-        relevant = sum(1 for s in parsed.spans if s.relevant and 1 <= s.span <= len(spans))
-        return TriadResult(
-            answer_relevance=float(parsed.answer_relevance),
-            relevant_spans=relevant,
-            total_spans=len(spans),
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
+        record_generation(
+            self.settings,
+            name="triad",
+            model=self.settings.evaluate.ragas_model,
+            prompt=prompt,
+            output=repr(parsed) if parsed is not None else "",
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            latency_ms=latency_ms,
+            cost_usd=triad_cost([result], self.settings.evaluate.ragas_model),
+            metadata={"spans": len(spans), "unparsed": parsed is None},
         )
+        return result
 
 
 def mean_or_none(values: list[float | None]) -> float | None:
