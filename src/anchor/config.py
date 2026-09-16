@@ -243,7 +243,12 @@ class TrackSettings(BaseModel):
     wandb_project: str = "anchor"
     wandb_entity: str = ""
 
-    use_langfuse: bool = True
+    # Off by default. The integration is written and unit-tested, but no
+    # Langfuse server has ever received a trace from it, and verifying that
+    # needs an account this project does not have. Defaulting it on would mean
+    # every run attempts a connection that is known not to be configured.
+    # Set ANCHOR_TRACK__USE_LANGFUSE=true with keys present to turn it back on.
+    use_langfuse: bool = False
 
 
 class ApiSettings(BaseModel):

@@ -1,0 +1,52 @@
+# k6 as a Job inside the cluster.
+#
+# The first attempt at this drove load through `kubectl port-forward` from the
+# host and every request failed partway in with connection refused: a
+# port-forward is a single multiplexed tunnel through the API server, and it
+# collapses under concurrency. That is a property of the tool, not of the
+# service -- but it meant the load test was measuring the tunnel.
+#
+# Running the generator in-cluster removes the tunnel entirely, and it is also
+# the more honest test: traffic reaches the Service the same way a real client
+# inside the cluster would, through kube-proxy and the Service's endpoints, so
+# it exercises the load balancing across replicas that the autoscaler creates.
+# The script is NOT inlined here. It lives in deploy/load/search.js and is the
+# same file k6 runs locally, so the two cannot drift. Create the ConfigMap from
+# it before applying this Job:
+#
+#   kubectl create configmap k6-search -n anchor \
+#     --from-file=search.js=deploy/load/search.js \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#
+# An earlier version of this file carried a placeholder ConfigMap inline, which
+# silently overwrote the real script every time the Job was applied.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-search
+  namespace: anchor
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: k6
+        image: grafana/k6:latest
+        args: ["run", "--quiet", "/scripts/search.js"]
+        env:
+        - { name: BASE_URL, value: "http://anchor-api.anchor.svc.cluster.local:8080" }
+        - { name: RATE,     value: "6" }
+        - { name: MINUTES,  value: "6" }
+        resources:
+          # The generator must not compete with the thing it is measuring. k6 is
+          # cheap, but on a laptop where the API pods want two cores each, an
+          # unbounded load generator would steal exactly the CPU the autoscaler
+          # is trying to allocate.
+          requests: { cpu: "100m", memory: "128Mi" }
+          limits:   { cpu: "500m", memory: "512Mi" }
+        volumeMounts:
+        - { name: scripts, mountPath: /scripts }
+      volumes:
+      - name: scripts
+        configMap: { name: k6-search }

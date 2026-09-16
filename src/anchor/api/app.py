@@ -57,6 +57,25 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=2000)
 
 
+class SearchRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=2000)
+
+
+class SearchResponse(BaseModel):
+    """Retrieval without generation.
+
+    Exists so the retrieval stack can be exercised on its own. /ask calls Claude
+    and costs money per request, which makes it useless as a load-test target;
+    this path is the same embedding, fusion and reranking work with the
+    generation step removed, so it measures the part of the service that
+    actually consumes CPU.
+    """
+
+    query: str
+    spans: list[SpanOut]
+    latency_ms: int
+
+
 class SpanOut(BaseModel):
     number: int
     source_path: str
@@ -118,6 +137,22 @@ def _to_response(result: GroundedAnswer) -> AskResponse:
     )
 
 
+def _embedder(settings: Settings) -> Embedder:
+    """The process-wide encoder, built on demand if the lifespan did not run.
+
+    TestClient and any direct import skip startup, and a request that silently
+    got no encoder would fail deep inside the query path rather than here.
+    """
+    cached = _state.get("embedder")
+    if cached is not None:
+        return cached  # type: ignore[no-any-return]
+    return Embedder(
+        settings.index.embedding_model,
+        normalize=settings.index.normalize_embeddings,
+        query_instruction=settings.index.query_instruction,
+    )
+
+
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     """Corpus state, not just process liveness.
@@ -160,3 +195,41 @@ def ask(request: AskRequest) -> AskResponse:
     settings: Settings = _state.get("settings") or get_settings()
     result = grounded_answer(request.question, settings, embedder=_state.get("embedder"))
     return _to_response(result)
+
+
+@app.post("/search", response_model=SearchResponse)
+def search_endpoint(request: SearchRequest) -> SearchResponse:
+    """Retrieve spans for a query. Calls no model beyond the local encoders."""
+    import time
+
+    from anchor.retrieve.search import search as run_search
+
+    settings: Settings = _state.get("settings") or get_settings()
+    started = time.perf_counter()
+    with db.connect(settings) as conn:
+        hits = run_search(
+            conn,
+            request.query,
+            settings,
+            _embedder(settings),
+            strategy=settings.chunk.strategy.value,
+        )
+    latency_ms = int((time.perf_counter() - started) * 1000)
+
+    return SearchResponse(
+        query=request.query,
+        latency_ms=latency_ms,
+        spans=[
+            SpanOut(
+                number=i,
+                source_path=hit.source_path,
+                heading_path=hit.heading_path,
+                url=hit.url,
+                vllm_version=hit.vllm_version,
+                # Nothing was generated, so nothing cited anything.
+                cited=False,
+                text=hit.text,
+            )
+            for i, hit in enumerate(hits, start=1)
+        ],
+    )

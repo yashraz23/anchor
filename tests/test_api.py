@@ -119,3 +119,59 @@ def test_support_may_be_absent_without_being_zero(client: TestClient) -> None:
     assert body["support"] == 1.0
     assert body["claims"] == 1
     assert body["supported_claims"] == 1
+
+
+@pytest.fixture
+def search_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """/search with retrieval and the database stubbed.
+
+    The endpoint exists to be driven hard by a load generator, so the contract
+    worth pinning is that it returns spans and never reaches the generator.
+    """
+
+    def fake_search(conn, query, settings, embedder, strategy=None, mode=None):  # type: ignore[no-untyped-def]
+        return [_hit("a span"), _hit("another span")]
+
+    import anchor.retrieve.search as search_module
+
+    monkeypatch.setattr(search_module, "search", fake_search)
+    monkeypatch.setattr(api_module.db, "connect", lambda settings: _NullConn())
+    monkeypatch.setattr(api_module, "_embedder", lambda settings: object())
+    with TestClient(api_module.app) as c:
+        yield c
+
+
+class _NullConn:
+    """Stands in for a connection; the stubbed search never queries through it."""
+
+    def __enter__(self) -> _NullConn:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+
+def test_search_returns_numbered_spans(search_client: TestClient) -> None:
+    body = search_client.post("/search", json={"query": "what is max_num_seqs"}).json()
+    assert [s["number"] for s in body["spans"]] == [1, 2]
+    assert body["query"] == "what is max_num_seqs"
+
+
+def test_search_reports_its_own_latency(search_client: TestClient) -> None:
+    """The load test reads this field, so it has to be present and numeric."""
+    body = search_client.post("/search", json={"query": "what is max_num_seqs"}).json()
+    assert isinstance(body["latency_ms"], int)
+
+
+def test_search_never_claims_a_citation(search_client: TestClient) -> None:
+    """Nothing was generated, so nothing cited anything.
+
+    Reporting cited spans here would let a retrieval-only call be mistaken for
+    a grounded answer.
+    """
+    body = search_client.post("/search", json={"query": "what is max_num_seqs"}).json()
+    assert all(s["cited"] is False for s in body["spans"])
+
+
+def test_search_rejects_a_too_short_query(search_client: TestClient) -> None:
+    assert search_client.post("/search", json={"query": "a"}).status_code == 422

@@ -1,0 +1,26 @@
+# The API image with both encoders baked in.
+#
+# The base image downloads bge-small and bge-reranker-base on first use, about
+# 1.2 GB. That is fine for a single long-lived container and wrong for an
+# autoscaled Deployment: every replica the autoscaler adds would spend its first
+# minute pulling weights before it could serve, so the new pod arrives long
+# after the burst that called for it. Baking them in trades image size for a
+# pod that is useful as soon as it is scheduled, which is the whole point of
+# scaling on demand.
+FROM anchor:latest
+
+ENV HF_HOME=/opt/models \
+    HF_HUB_OFFLINE=0
+
+# Fetch at build time, into a layer. Downloading the encoders rather than
+# importing anchor keeps this independent of the database, which is not
+# reachable during a build.
+RUN python -c "\
+from sentence_transformers import SentenceTransformer, CrossEncoder; \
+SentenceTransformer('BAAI/bge-small-en-v1.5'); \
+CrossEncoder('BAAI/bge-reranker-base'); \
+print('encoders cached')"
+
+# Offline from here on. If a weight is missing the pod must fail loudly at
+# startup rather than quietly reach for the network under load.
+ENV HF_HUB_OFFLINE=1

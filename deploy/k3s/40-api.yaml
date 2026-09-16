@@ -1,0 +1,104 @@
+# The anchor API on Kubernetes.
+#
+# This is the part of the stack that k3s can actually run on this machine. The
+# vLLM Deployment in 20-vllm.yaml needs a GPU inside a pod, which WSL2 does not
+# allow (see deploy/RESULTS.md); the API needs only CPU, so it runs here for
+# real and the autoscaler in 50-api-hpa.yaml is measured rather than asserted.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: anchor
+---
+# The corpus lives in the Postgres container started by docker-compose, outside
+# the cluster. Pointing at it through k3d's host gateway keeps one corpus rather
+# than loading a second copy into the cluster, so what the pods retrieve is the
+# same 12,610 chunks every published number was measured against.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anchor-env
+  namespace: anchor
+data:
+  ANCHOR_PG_DSN: "postgresql://anchor:anchor@host.k3d.internal:5433/anchor"
+  HF_HOME: "/opt/models"
+  HF_HUB_OFFLINE: "1"
+  # torch reads the host's core count, not the cgroup quota, so in a container
+  # limited to 2 cores it started 16 threads and spent most of its time being
+  # throttled by the scheduler rather than working. A single search then
+  # saturated the process badly enough to starve its own /health endpoint, and
+  # Kubernetes pulled the pod out of service while it was merely busy. Pinning
+  # the thread count to the limit is the fix; it is not a tuning preference.
+  OMP_NUM_THREADS: "2"
+  MKL_NUM_THREADS: "2"
+  TOKENIZERS_PARALLELISM: "false"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anchor-api
+  namespace: anchor
+  labels: { app: anchor-api }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: anchor-api }
+  template:
+    metadata:
+      labels: { app: anchor-api }
+    spec:
+      containers:
+      - name: api
+        image: anchor-api:k8s
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef: { name: anchor-env }
+        ports:
+        - { name: http, containerPort: 8080 }
+        resources:
+          # The request is the denominator the HPA divides by, so it is a policy
+          # choice and not just a scheduling hint. 1000m against a reranker that
+          # saturates a core means one replica reads as 200% busy while serving,
+          # which is what makes the 70% target below fire early enough to matter.
+          requests: { cpu: "1000m", memory: "1200Mi" }
+          limits:   { cpu: "2000m", memory: "3Gi" }
+        # Model load plus the first database connection takes a while. A startup
+        # probe carries that period so the liveness probe can stay short
+        # afterwards, instead of a long initialDelay that would also delay
+        # detecting a genuinely wedged pod later on.
+        startupProbe:
+          httpGet: { path: /health, port: http }
+          periodSeconds: 5
+          failureThreshold: 60
+        readinessProbe:
+          httpGet: { path: /health, port: http }
+          periodSeconds: 10
+          # A busy worker is not a broken one. Without room here the pod is
+          # evicted from the Service under exactly the load the autoscaler
+          # exists to handle, so replicas drop out as traffic arrives.
+          timeoutSeconds: 5
+          failureThreshold: 6
+        # Liveness must not depend on anything the pod does not own. Pointed at
+        # /health it asked "can you reach Postgres and count 12,610 chunks?",
+        # which is slow under load and unanswerable during a database blip, so
+        # Kubernetes restarted pods for being busy -- 1 to 3 restarts each
+        # during the first overload run, which dropped in-flight requests and
+        # made the overload worse. /openapi.json is FastAPI's own schema route,
+        # served from memory, so it answers if and only if the process is alive
+        # and its event loop is turning. Readiness still uses /health, which is
+        # the right place for a dependency check: it takes a pod out of the
+        # Service without killing it.
+        livenessProbe:
+          httpGet: { path: /openapi.json, port: http }
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anchor-api
+  namespace: anchor
+spec:
+  selector: { app: anchor-api }
+  ports:
+  - { name: http, port: 8080, targetPort: http }

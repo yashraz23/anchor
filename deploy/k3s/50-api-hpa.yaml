@@ -1,0 +1,50 @@
+# Autoscaling the API on CPU.
+#
+# Distinct from 30-hpa.yaml, and the difference is the point. That one scales
+# vLLM on queue depth, because a GPU server saturates long before its
+# utilisation looks alarming -- the phase 3 load test held 12.5 req/s at 18% GPU
+# utilisation. This one scales the API on CPU, because the API genuinely is CPU
+# bound: a search spends most of its 4.3 s in the cross-encoder scoring the
+# shortlist on the processor. Same mechanism, different signal, chosen from what
+# actually runs out first in each case.
+#
+# This one is exercised. See deploy/RESULTS.md for the measured scale-up.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: anchor-api
+  namespace: anchor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: anchor-api
+  minReplicas: 1
+  # Three nodes, and the reranker will take a whole core when it has one. Past
+  # four replicas this laptop is scheduling contention rather than capacity.
+  maxReplicas: 4
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        # Of the 1000m request, so a replica at 700m triggers growth. Deliberately
+        # below 100%: waiting for a replica to be fully busy means every new pod
+        # is already late, and this one takes about a minute to become ready.
+        type: Utilization
+        averageUtilization: 70
+  behavior:
+    scaleUp:
+      # No stabilisation window. The pod start cost is already the lag here;
+      # adding a waiting period on top would make the autoscaler respond to a
+      # burst after it has passed.
+      stabilizationWindowSeconds: 0
+      policies:
+      - { type: Pods, value: 2, periodSeconds: 60 }
+    scaleDown:
+      # Slow on the way down. The encoders are held in process memory, so a
+      # replica that is killed and recreated pays the model load again, which
+      # costs more than the idle core it frees.
+      stabilizationWindowSeconds: 300
+      policies:
+      - { type: Pods, value: 1, periodSeconds: 120 }
